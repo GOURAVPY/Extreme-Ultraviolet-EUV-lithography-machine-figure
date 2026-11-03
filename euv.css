@@ -63,3 +63,7 @@
 .eu-n { font-variant-numeric: tabular-nums; color: var(--anatomy-muted); margin-right: 4px; }
 .eu-note { display: block; color: var(--anatomy-muted); font-size: 11.5px; padding-left: 22px; }
 .eu-ls { stroke-width: 0.5; stroke-opacity: 0.7; }
+.eu-controls { margin: 12px 0 0; }
+.eu-apart { all: unset; cursor: pointer; font: 500 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.12em; text-transform: uppercase; color: var(--anatomy-strong); padding: 8px 12px; border: 1px solid var(--anatomy-faint); border-radius: 4px; }
+.eu-apart:hover, .eu-apart[data-on] { border-color: var(--anatomy-muted); }
+.eu-apart:focus-visible { outline: 1px solid var(--anatomy-muted); outline-offset: 2px; }

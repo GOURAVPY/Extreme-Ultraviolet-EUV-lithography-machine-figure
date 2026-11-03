@@ -36,6 +36,74 @@ const pulseStarts = pulseLengths.map((_, i) => pulseLengths.slice(0, i).reduce((
 const pulseTotal = pulseLengths.reduce((a, b) => a + b, 0);
 pulses.forEach((p, i) => { p.style.strokeDasharray = `26 ${pulseLengths[i] + 60}`; });
 
+// ------------------------------------------------------------------ taking it apart
+// One spring per assembly (0 home, 1 apart), staggered in DATA.stagger order on the way out and the reverse
+// on the way back; every wrapper is moved by its assembly's share and re-sorted by key + lift x share.
+const machine = stage.querySelector(".eu-machine");
+const nodes = [...machine.children].map((el) => ({ el, piece: el.dataset.piece, key: Number(el.dataset.k), lift: Number(el.dataset.l), shown: "" }));
+let order = nodes.map((_, i) => i);
+const STAGGER = DATA.stagger;
+const SPRING = DATA.spring;
+const pieces = Object.fromEntries(Object.keys(DATA.moves).map((id) => [id, { x: 0, v: 0, target: 0, pending: null }]));
+const apartButton = document.querySelector("[data-apart]");
+let apart = false;
+function setApart(on) {
+  if (apart === on) return;
+  apart = on;
+  const goal = on ? 1 : 0;
+  let index = 0;
+  for (const id of on ? STAGGER : [...STAGGER].reverse()) {
+    if (pieces[id].target === goal && !pieces[id].pending) continue;
+    if (pieces[id].target === goal) pieces[id].pending = null;
+    else pieces[id].pending = { value: goal, at: springClock + (still.matches ? 0 : index++ * SPRING.stagger) };
+  }
+  apartButton.textContent = on ? "Put together" : "Take apart";
+  apartButton.toggleAttribute("data-on", on);
+  status.textContent = on ? "taking apart: the machine stops first" : "putting it back together";
+  run();
+}
+function steer(state, dt, calm) {
+  if (state.pending && springClock >= state.pending.at) {
+    state.target = state.pending.value;
+    state.pending = null;
+  }
+  if (calm) {
+    state.x = state.target;
+    state.v = 0;
+    return false;
+  }
+  for (let i = 0; i < SPRING.substeps; i++) {
+    const h = dt / SPRING.substeps;
+    state.v += ((state.target - state.x) * SPRING.stiffness - state.v * SPRING.damping) * h;
+    state.x += state.v * h;
+  }
+  if (Math.abs(state.target - state.x) < 2e-4 && Math.abs(state.v) < 2e-4) {
+    state.x = state.target;
+    state.v = 0;
+    return state.pending !== null;
+  }
+  return true;
+}
+function placePieces() {
+  for (const node of nodes) {
+    const share = pieces[node.piece].x;
+    const [mx, my] = DATA.moves[node.piece];
+    const text = share === 0 ? "" : `translate(${(mx * share).toFixed(2)} ${(my * share).toFixed(2)})`;
+    if (text !== node.shown) {
+      node.shown = text;
+      if (text) node.el.setAttribute("transform", text);
+      else node.el.removeAttribute("transform");
+    }
+  }
+  const next = nodes.map((_, i) => i).sort((a, b) => nodes[a].key + nodes[a].lift * pieces[nodes[a].piece].x - (nodes[b].key + nodes[b].lift * pieces[nodes[b].piece].x));
+  if (next.some((index, at) => index !== order[at])) {
+    const fragment = document.createDocumentFragment();
+    for (const index of next) fragment.appendChild(nodes[index].el);
+    machine.appendChild(fragment);
+    order = next;
+  }
+}
+
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const burst = (age, rise, fall) => (age <= 0 ? 0 : smooth(0, rise, age) * Math.exp(-Math.max(0, age - rise) / fall));
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
@@ -127,18 +195,23 @@ stage.addEventListener("keydown", (e) => {
     hold();
     pick(SYSTEMS[n], { fromUser: true });
     e.preventDefault();
-  } else if (e.key === " ") {
+  } else if (e.key === " " || e.key === "Enter") {
+    hold();
+    tourOpened = false;
+    setApart(!apart);
+    e.preventDefault();
+  } else if (e.key === "p" || e.key === "P") {
     paused = !paused;
     status.textContent = paused ? "paused" : "running";
     hold();
-    if (!paused) run();
-    e.preventDefault();
+    run();
   } else if (e.key === "Escape") {
     hold();
     pick(null);
   }
 });
-stage.addEventListener("focus", () => { status.textContent = picked ? NAMES[picked] : "running"; });
+stage.addEventListener("focus", () => { status.textContent = picked ? NAMES[picked] : apart ? "apart" : "running"; });
+apartButton.addEventListener("click", () => { hold(); tourOpened = false; setApart(!apart); });
 
 // ------------------------------------------------------------------ the frame
 // start part way through a wafer (or at ?t=seconds, for checking a moment)
@@ -146,6 +219,9 @@ const startAt = Number(new URLSearchParams(location.search).get("t"));
 let clock = Number.isFinite(startAt) && startAt > 0 ? startAt : 0.4 * (DATA.fields.length * ((FIELD_SCAN_MS / 1000) * STAGE_SLOW + 0.1 * STAGE_SLOW));
 let srcClock = 0;
 let tourClock = 0;
+let springClock = 0;
+let power = 1;
+let tourOpened = false;
 const TOUR_STEP = 4.5;
 const fmt1 = (v, d = 0) => fmt(v, d);
 
@@ -176,14 +252,27 @@ function tick(now) {
   const real = last ? Math.min((now - last) / 1000, 1 / 30) : 1 / 60;
   last = now;
   const calm = still.matches;
-  const dt = paused || calm ? 0 : real;
+  if (touring && !calm) {
+    // the tour visits every subsystem, rests on the whole machine, then takes it apart once
+    tourClock += real;
+    const n = Math.floor(tourClock / TOUR_STEP) % (SYSTEMS.length + 2);
+    pick(n < SYSTEMS.length ? SYSTEMS[n] : null);
+    // the tour only closes what it opened: a machine the reader took apart stays apart
+    if (n === SYSTEMS.length + 1 && !apart) { setApart(true); tourOpened = true; }
+    else if (n !== SYSTEMS.length + 1 && tourOpened) { setApart(false); tourOpened = false; }
+  }
+  // springs run on real time, so they can move while the machine is paused or stopped
+  springClock += real;
+  let moving = false;
+  for (const id of Object.keys(pieces)) if (steer(pieces[id], real, calm)) moving = true;
+  placePieces();
+  // armed: the machine only runs while every assembly is home; it slows to a stop before anything moves
+  const home = Object.values(pieces).every((s) => s.x < 0.002 && s.target === 0 && !s.pending);
+  power = calm ? (home ? 1 : 0) : power + ((home ? 1 : 0) - power) * (1 - Math.exp(-real / 0.25));
+  if (power < 1e-3) power = 0;
+  const dt = paused || calm ? 0 : real * power;
   clock += dt;
   srcClock += dt;
-  if (touring && !calm) {
-    tourClock += real;
-    const n = Math.floor(tourClock / TOUR_STEP) % (SYSTEMS.length + 1);
-    pick(n < SYSTEMS.length ? SYSTEMS[n] : null);
-  }
 
   // source: droplets march in; the one at the focus is flattened, then flashed to plasma
   const cycles = calm ? 0.35 : srcClock / SRC_PERIOD;
@@ -210,9 +299,9 @@ function tick(now) {
   });
   const ageSec = phase * SRC_PERIOD;
   const mainAge = (phase - CYCLE.main) * SRC_PERIOD;
-  const pre = calm ? 0 : burst(ageSec, 0.04, 0.08) * 0.55;
-  const main = calm ? 0 : burst(mainAge, 0.05, 0.12);
-  const plasma = calm ? 0 : burst(mainAge - 0.02, 0.06, 0.32);
+  const pre = calm ? 0 : burst(ageSec, 0.04, 0.08) * 0.55 * power;
+  const main = calm ? 0 : burst(mainAge, 0.05, 0.12) * power;
+  const plasma = calm ? 0 : burst(mainAge - 0.02, 0.06, 0.32) * power;
   laser.style.opacity = Math.max(pre, main).toFixed(3);
   for (const a of amps) a.style.fillOpacity = (0.12 + 0.75 * Math.max(pre, main)).toFixed(3);
   halo.style.opacity = plasma.toFixed(3);
@@ -222,11 +311,11 @@ function tick(now) {
   const travel = calm ? 0 : smooth(0, 1.1, mainAge);
   const pulseOn = calm ? 0 : smooth(0, 0.08, mainAge) * (1 - smooth(0.95, 1.25, mainAge));
   pulses.forEach((p, i) => {
-    p.style.opacity = (0.9 * pulseOn).toFixed(3);
+    p.style.opacity = (0.9 * pulseOn * power).toFixed(3);
     p.style.strokeDashoffset = (pulseStarts[i] - travel * pulseTotal).toFixed(1);
   });
-  for (const l of lights) if (l !== poLight) l.style.opacity = (0.7 + 0.3 * plasma).toFixed(3);
-  ifGlow.style.opacity = (0.45 + 0.55 * burst(mainAge - 0.08, 0.06, 0.3)).toFixed(3);
+  for (const l of lights) if (l !== poLight) l.style.opacity = ((0.7 + 0.3 * plasma) * power).toFixed(3);
+  ifGlow.style.opacity = ((0.45 + 0.55 * burst(mainAge - 0.08, 0.06, 0.3)) * power).toFixed(3);
 
   // stages: one wafer of fields, then the chucks trade places
   const t = calm ? WAFER_TIME * 0.45 : clock % CYCLE_TIME;
@@ -267,10 +356,10 @@ function tick(now) {
   const shut = swapping ? 1 : 1 - smooth(0, 0.06, local) * (1 - smooth(SCAN - 0.06, SCAN, local));
   rema[0].setAttribute("transform", translateAlong(P, [2.4 * shut, 0, 0]));
   rema[1].setAttribute("transform", translateAlong(P, [-2.4 * shut, 0, 0]));
-  poLight.style.opacity = ((0.7 + 0.3 * plasma) * (1 - 0.85 * shut)).toFixed(3);
-  slit.style.opacity = (1 - shut).toFixed(3);
+  poLight.style.opacity = ((0.7 + 0.3 * plasma) * (1 - 0.85 * shut) * power).toFixed(3);
+  slit.style.opacity = ((1 - shut) * power).toFixed(3);
   // the level sensor goes dark while the chucks trade places, and lights again on the new wafer
-  levelBeams.style.opacity = swapping ? (1 - Math.sin(Math.PI * Math.min(1, (t - WAFER_TIME) / SWAP))).toFixed(3) : "1";
+  levelBeams.style.opacity = ((swapping ? 1 - Math.sin(Math.PI * Math.min(1, (t - WAFER_TIME) / SWAP)) : 1) * power).toFixed(3);
 
   // fields: done, now, waiting
   const fe = fields[expose];
@@ -290,8 +379,12 @@ function tick(now) {
   }
 
   const src = { phase };
-  readout.textContent = readoutFor(picked, src, exp, meas, exp.i + 1, swapping);
-  frame = visible && !paused && !calm ? requestAnimationFrame(tick) : 0;
+  const moved = Object.values(pieces).filter((s) => s.x > 0.5).length;
+  readout.textContent = moving
+    ? apart ? "taking apart" : "closing up · arming"
+    : !home ? (picked ? readoutFor(picked, src, exp, meas, exp.i + 1, swapping) + " · stopped" : `apart · ${moved} assemblies off · stopped`)
+    : readoutFor(picked, src, exp, meas, exp.i + 1, swapping);
+  frame = visible && ((!paused && !calm) || moving) ? requestAnimationFrame(tick) : 0;
 }
 function run() {
   if (!frame && visible) { last = 0; frame = requestAnimationFrame(tick); }

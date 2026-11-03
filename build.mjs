@@ -12,7 +12,7 @@ const THEME = process.argv.includes("--light") ? "light" : "dark";
 const strip = (file) => readFileSync(join(HERE, file), "utf8").replace(/^import .*$/gm, "").replace(/^export /gm, "");
 
 const W = 820;
-const H = 730;
+const H = 790;
 const AZIMUTH = 58;
 const ELEVATION = 28;
 
@@ -58,7 +58,9 @@ const WX = 140;
 const MEAS_X = 270;
 
 const P = k.fitProjection(
-  [...k.boxCorners(SUB, SUB_Z - 10, SUB_Z), ...k.boxCorners(FAB, -10, 0), [-262, -100, 146], [-235, -85, 324], [205, -85, 350], [205, 0, 350], [400, 30, 120], [400, -100, 120]],
+  [...k.boxCorners(SUB, SUB_Z - 10, SUB_Z), ...k.boxCorners(FAB, -10, 0), [-262, -100, 146], [-235, -85, 324], [205, -85, 350], [205, 0, 350], [400, 30, 120], [400, -100, 120],
+    // the apart pose: illuminator up 40, reticle stage up 55
+    [-235, -85, 368], [-235, 0, 368], [94, -85, 368], [30, -85, 402], [205, -85, 402], [30, 0, 402], [205, 0, 402]],
   W,
   H,
   { pad: 26, azimuth: AZIMUTH, elevation: ELEVATION },
@@ -73,11 +75,28 @@ const path3 = (points, closed = false) => k.pathOf(points.map(at), closed);
 const f2 = (v) => Math.round(v * 100) / 100;
 const xz = ([x, z], y = Y0) => [x, y, z];
 
-const R = A.recorder(P);
+// Taking it apart: the reticle stage lifts off first, then the illuminator and the projection optics rise off
+// their columns and frame, the metrology bridge lifts off its posts, and the source chamber slides out to the left.
+// The floors, the laser in the subfab, the stage base and its chucks, the frames and the racks stay put.
+const PIECES = { stand: [0, 0, 0], reticle: [0, 0, 55], illum: [0, 0, 40], po: [0, 0, 25], metro: [0, 0, 30], source: [-32, 0, 0] };
+const STAGGER = ["reticle", "illum", "po", "metro", "source"];
+const SPRING = { stagger: 0.035, stiffness: 64, damping: 14.2, substeps: 4 };
+function pieceOf(name) {
+  if (/^(po\.(leg|airmount|crossbeam)|metro\.leg|illum\.column)/.test(name)) return "stand";
+  if (/^reticle\./.test(name)) return "reticle";
+  if (/^(illum\.|if\.|vac\.turbo\.illum)/.test(name)) return "illum";
+  if (/^(po\.|stages\.grid|handler\.reticle)/.test(name)) return "po";
+  if (/^metro\./.test(name)) return "metro";
+  if (/^(vessel\.|collector|final\.focus|tin\.|source\.|vac\.(h2\.line|h2\.inlet|turbo\.source|foreline\.source|floor\.port))/.test(name)) return "source";
+  return "stand";
+}
+
+const R = A.recorder(P, { order: STAGGER, spring: SPRING });
 const record = R.solid;
 let SYS = "frame";
 function put(name, ref, svg, shapes = [], { bias = 0, sys = SYS, ...rest } = {}) {
-  return R.put({ name, at: ref, where: ref, bias, svg, shapes, piece: "machine", sys, ...rest });
+  const piece = pieceOf(name);
+  return R.put({ name, at: ref, where: ref, bias, svg, shapes, piece, move: PIECES[piece], sys, ...rest });
 }
 function box(name, [x0, y0, z0], [x1, y1, z1], style = {}, { r = 0.6, steps = 2, bevel = 0, extra = "", inner = "", bias = 0, ground = false, sys } = {}) {
   const plan = { x: x0, y: y0, w: x1 - x0, d: y1 - y0, r };
@@ -107,12 +126,13 @@ const PIPES = [];
 const ARM_X = [];
 // Looked at 8x: the floor slab counts as a rod, but these lines end on blocks standing well inside it.
 const CROWD_OK = [["vac.h2.line", "stand.fab"]];
-function pipe(name, points, r, { tone = "mid", bend = 0, flanges = [true, true], maxLength = 18, rings, limp = false, bias = 0.02, sys } = {}) {
+function pipe(name, points, r, { tone = "mid", bend = 0, flanges = [true, true], maxLength = 18, rings, limp = false, bias = 0.02, sys, free = [false, false] } = {}) {
   const route = G.fillet(points, Math.max(bend || r * 2.6, 3), 10, { P, tube: r });
   const total = G.pathLength(route);
   const FL = Math.max(1.2, r * 0.6);
   const gaps = [...(flanges[0] ? [[0, FL]] : []), ...(flanges[1] ? [[total - FL, total]] : [])];
-  R.route(name, route, r, { gaps, limp, piece: "machine" });
+  const piece = pieceOf(name);
+  R.route(name, route, r, { gaps, limp, piece, move: PIECES[piece], free });
   PIPES.push(name);
   tubePieces(route, r, P, { maxLength, spacing: Math.max(0.6, Math.min(1.6, r)), gaps, ...(rings ? { rings } : {}) }).forEach((piece, index) =>
     put(`${name}:${index}`, piece.mid, tubeSvg(piece, { tone }), [A.tube(piece.points, piece.radii)], { bias, sys, route: name }),
@@ -343,8 +363,8 @@ ribs("po", PO, [], { pitch: 18 });
 const PO_POST_Y = [-110, 34];
 for (const x of [100, 201]) {
   for (const y of PO_POST_Y) {
-    disc("po.post", zF(x, y, 0), 0, 3, 6, { tone: "lo" }, { sys: "po" });
-    disc("po.post", zF(x, y, 0), 3, 71, 3.4, { tone: "mid" }, { sys: "po" });
+    disc("po.leg", zF(x, y, 0), 0, 3, 6, { tone: "lo" }, { sys: "po" });
+    disc("po.leg", zF(x, y, 0), 3, 71, 3.4, { tone: "mid" }, { sys: "po" });
     turned("po.airmount", zF(x, y, 80 - 9), [[0, 4.6], [9, 4.6]], { tone: "hi" }, { sys: "po" });
   }
   box("po.crossbeam", [x - 4, PO_POST_Y[0] - 4, 80], [x + 4, PO_POST_Y[1] + 4, PO[4]], { tone: "mid" }, { sys: "po", bevel: 0.3 });
@@ -371,8 +391,8 @@ box("stages.base", [BASE.x, BASE.y, 0], [BASE.x + BASE.w, BASE.y + BASE.d, BASE_
 });
 SYS = "metro";
 for (const y of PO_POST_Y) {
-  disc("metro.post", zF(MEAS_X, y, 0), 0, 3, 6, { tone: "lo" }, { sys: "metro" });
-  disc("metro.post", zF(MEAS_X, y, 0), 3, 104, 3.4, { tone: "mid" }, { sys: "metro" });
+  disc("metro.leg", zF(MEAS_X, y, 0), 0, 3, 6, { tone: "lo" }, { sys: "metro" });
+  disc("metro.leg", zF(MEAS_X, y, 0), 3, 104, 3.4, { tone: "mid" }, { sys: "metro" });
 }
 box("metro.bridge", [MEAS_X - 6, PO_POST_Y[0] - 4, 104], [MEAS_X + 6, PO_POST_Y[1] + 4, 114], { tone: "mid" }, { sys: "metro", bevel: 0.4 });
 // sensor plate under the bridge: level sensor projector and detector either side, alignment sensor between
@@ -407,7 +427,7 @@ const H2C_H = 62;
 }
 const H2X = H2C.x + H2C.w / 2 + 18;
 box("vac.h2.inlet", [H2X - 6, -6, VESSEL[4] + 4], [H2X + 6, 6, 20], { tone: "hi" }, { sys: "vac", bevel: 0.3, extra: Dots([at([H2X - 4, 6, 18]), at([H2X + 4, 6, 18])], { size: 0.4 }) });
-pipe("vac.h2.line", [[H2X, 78, SUB_Z + H2C_H], [H2X, 78, 12], [H2X, 6, 12]], 1.6, { sys: "vac", tone: "hi", bend: 6, flanges: [true, true] });
+pipe("vac.h2.line", [[H2X, 78, SUB_Z + H2C_H], [H2X, 78, 12], [H2X, 6, 12]], 1.6, { sys: "vac", tone: "hi", bend: 6, flanges: [true, true], free: [true, false] });
 // a turbo pump on the source vessel's side, its foreline down through the floor to the dry pumps
 {
   const F = xF(VESSEL[1], -62, 70);
@@ -587,22 +607,22 @@ const stageSlot = indexOf((it) => it.name === "stages.chucks");
 
 // Moving parts live in reserved slots of the settled order.
 const slots = new Map();
-const addSlot = (index, svg) => slots.set(index, (slots.get(index) ?? "") + svg);
+const addSlot = (index, svg, piece) => slots.set(index, [...(slots.get(index) ?? []), { svg, piece }]);
 const inside = (prefixes) => indexOf((it) => prefixes.some((p) => it.name === p || it.name.startsWith(p + ".")) && !/\.(post|top\.front|top\.right|crossbeam|airmount|column|right)$/.test(it.name));
 
 // droplets, the laser hit and the source light, inside the vessel after the collector and generator
 const DROPS = 9;
-addSlot(inside(["collector", "tin", "final.focus", "vessel.back", "vessel.left", "vessel.floor", "if.cone"]),
+addSlot(inside(["collector", "tin", "final.focus", "vessel.back", "vessel.left", "vessel.floor"]),
   lightSvg("src") +
   `<g data-part="laser-hit"><path class="eu-laser" d="${path3([[PL[0], Y0, FFOC.z1], PLASMA])}"/></g>` +
   `<g data-part="drops">${Array.from({ length: DROPS }, () => `<ellipse class="eu-drop" rx="1.1" ry="1.1" cx="0" cy="0"/>`).join("")}</g>` +
   `<defs><radialGradient id="eu-plasma-grad"><stop offset="0" class="eu-st0"/><stop offset="0.3" class="eu-st1"/><stop offset="1" class="eu-st2"/></radialGradient></defs>` +
-  `<g data-part="plasma"><circle class="eu-plasma-halo" cx="${f2(at(PLASMA)[0])}" cy="${f2(at(PLASMA)[1])}" r="18"/><circle class="eu-plasma-core" cx="${f2(at(PLASMA)[0])}" cy="${f2(at(PLASMA)[1])}" r="2.6"/></g>`);
+  `<g data-part="plasma"><circle class="eu-plasma-halo" cx="${f2(at(PLASMA)[0])}" cy="${f2(at(PLASMA)[1])}" r="18"/><circle class="eu-plasma-core" cx="${f2(at(PLASMA)[0])}" cy="${f2(at(PLASMA)[1])}" r="2.6"/></g>`, "source");
 
 // light: after the last item inside each housing, before its front frame
 addSlot(inside(["illum.ffm", "illum.pfm", "illum.mc", "illum.mg", "illum.back", "illum.left", "illum.floor"]), lightSvg("ill") +
-  `<g data-part="if-glow"><circle class="eu-if" cx="${f2(at(xz(IFP))[0])}" cy="${f2(at(xz(IFP))[1])}" r="2.2"/></g>`);
-addSlot(inside(["po.m1", "po.m2", "po.m3", "po.m4", "po.m5", "po.m6", "po.back", "po.left", "po.floor", "po.dgl"]), lightSvg("po"));
+  `<g data-part="if-glow"><circle class="eu-if" cx="${f2(at(xz(IFP))[0])}" cy="${f2(at(xz(IFP))[1])}" r="2.2"/></g>`, "illum");
+addSlot(inside(["po.m1", "po.m2", "po.m3", "po.m4", "po.m5", "po.m6", "po.back", "po.left", "po.floor", "po.dgl"]), lightSvg("po"), "po");
 
 // reticle carriage on top: built at rest over the reticle, moved along x
 const CAR = { x0: RX - 26, x1: RX + 26, y0: RAIL_Y[0] - 2, y1: RAIL_Y[1] + 6, z0: PO[5] + 6, z1: PO[5] + 14 };
@@ -625,13 +645,20 @@ const reticleSvg = [
     .map(([x, y]) => S(k.cylinder(x, y, 1.6, CAR.z0 + 13, 2.2, P, 16), { tone: "mid" })),
   motor(blockOf(RAIL_Y[1])),
 ].join("");
-addSlot(R.items.length - 1, `<g class="it" data-sys="reticle" data-part="reticle-stage">${reticleSvg}</g>`);
+addSlot(R.items.length - 1, `<g class="it" data-sys="reticle" data-part="reticle-stage">${reticleSvg}</g>`, "reticle");
 
 addSlot(stageSlot, `<g class="it" data-sys="stages" data-part="chuck-a">${chuckSvg(WX, "a")}</g><g class="it" data-sys="stages" data-part="chuck-b">${chuckSvg(MEAS_X, "b")}</g>` +
   `<g data-part="level-beams">${Ln(path3([[LS.pro + 6, Y0, LS.z + 2], [MEAS_X, Y0, WZ + 0.05], [LS.det - 6, Y0, LS.z + 2]]), { tone: "lit", className: "eu-ls" })}${Dots([at([MEAS_X, Y0, WZ + 0.05])], { size: 0.8, tone: "hi" })}</g>` +
-  `<g data-part="slit"><path class="eu-slit" d="${k.onTop([[WX - 0.5, Y0 - mm(13)], [WX + 0.5, Y0 - mm(13)], [WX + 0.5, Y0 + mm(13)], [WX - 0.5, Y0 + mm(13)]], WZ + 0.05, P, true)}"/></g>`);
+  `<g data-part="slit"><path class="eu-slit" d="${k.onTop([[WX - 0.5, Y0 - mm(13)], [WX + 0.5, Y0 - mm(13)], [WX + 0.5, Y0 + mm(13)], [WX - 0.5, Y0 + mm(13)]], WZ + 0.05, P, true)}"/></g>`, "stand");
 
-const groups = R.items.map((item, index) => `<g class="it" data-sys="${item.sys}" data-name="${item.name}">${item.svg}</g>${slots.get(index) ?? ""}`);
+// Every item and every live slot sits in its own wrapper with its settled key and its lift (how much nearer the
+// viewer its assembly's move takes it), so the page can re-sort them while the machine comes apart.
+const liftOf = (piece) => G.dot3(PIECES[piece], V);
+const wrap = (piece, key, inner) => `<g class="pc" data-piece="${piece}" data-k="${key.toFixed(5)}" data-l="${liftOf(piece).toFixed(4)}">${inner}</g>`;
+const groups = R.items.map((item, index) =>
+  wrap(item.piece, item.key, `<g class="it" data-sys="${item.sys}" data-name="${item.name}">${item.svg}</g>`) +
+  (slots.get(index) ?? []).map((slot, j) => wrap(slot.piece, item.key + 1e-4 * (j + 1), slot.svg)).join(""),
+);
 
 const LABEL =
   "A cutaway EUV lithography scanner on a fab floor, with the CO2 drive laser in the subfab below. The laser's seed module and four amplifiers send pulses through a beam tube up into the source vessel, where they hit tin droplets in front of a collector mirror. The 13.5 nm light from the tin plasma converges to the intermediate focus, passes through the illuminator's facet mirrors to a reflective mask on a scanning reticle stage, and six projection mirrors shrink the pattern four times onto a wafer on one of two chucks, while the other chuck is measured under the metrology bridge.";
@@ -648,7 +675,9 @@ const DATA = {
   car: { travel: mm(M.RETICLE_FIELD_MM.scan) / 2 },
   wafer: { x: WX, meas: MEAS_X, mm: 1 / 5 },
   fields: M.FIELDS.map((f) => ({ cx: f2((f.x0 + f.x1) / 2), cy: f2((f.y0 + f.y1) / 2), dir: f.dir })),
-  chiefLength: 0,
+  moves: Object.fromEntries(Object.entries(PIECES).map(([id, m]) => [id, [f2(at(m)[0] - at([0, 0, 0])[0]), f2(at(m)[1] - at([0, 0, 0])[1])]])),
+  stagger: STAGGER,
+  spring: SPRING,
 };
 
 const CSS = readFileSync(join(HERE, "euv.css"), "utf8");
@@ -673,7 +702,7 @@ const body =
   k.plateHtml({
     fig: "Fig 1",
     title: "EUV scanner, cut away",
-    hint: "hover a part · ← → · space pauses",
+    hint: "hover a part · ← → · space takes it apart",
     readout: "starting",
     keys: [
       { mark: "lit", label: "13.5 nm light: collector to wafer, eleven mirrors after the plasma" },
@@ -681,7 +710,7 @@ const body =
       { mark: "raised", label: "Twin wafer chucks: one exposes, one is measured" },
     ],
     caption: `Tin droplets about ${M.DROPLET_UM} µm across leave the generator at about ${M.DROPLET_MS} m/s, ${M.fmt(M.DROPLET_HZ)} a second. A weak pre-pulse flattens each one into a disc; about ${M.PRE_TO_MAIN_US} µs later the main CO2 pulse (${M.CO2_UM} µm, ${M.PULSE_J} J) turns it into a plasma that glows at ${M.LAMBDA_NM} nm (${M.fmt(M.PHOTON_EV, 1)} eV photons). The collector focuses about ${M.P_IF} W to the intermediate focus. Air and glass both absorb this light, so everything runs in vacuum with a little hydrogen, and every optic is a mirror coated with about ${M.LAYERS} molybdenum and silicon layer pairs, each reflecting about ${Math.round(M.R_MIRROR * 100)}%. After ${M.REFLECTIONS} more reflections about ${M.fmt(M.P_WAFER, 1)} W reaches the wafer. While one wafer is exposed, the other chuck carries the next wafer under the metrology bridge, where a level sensor maps its height and an alignment sensor finds its marks; then the two chucks trade places. Masking blades shut the light between fields. The mask is lit 6° off normal, and the projection mirrors shrink its pattern 4:1, so the reticle stage scans four times as fast as the wafer stage and in the opposite direction. To give the resist ${M.DOSE_MJ_CM2} mJ/cm² through a ${M.FIELD_MM.slit} mm slit, the wafer moves at about ${M.fmt(M.WAFER_SPEED, 2)} m/s and the reticle at about ${M.fmt(M.RETICLE_SPEED, 2)} m/s; one ${M.FIELD_MM.slit} × ${M.FIELD_MM.scan} mm field takes ${Math.round(M.FIELD_SCAN_MS)} ms and about ${M.fmt(Math.round(M.PULSES_PER_FIELD / 100) * 100)} pulses. Motion is slowed: the source about 100,000 times, the stages about 4 times. Droplets are drawn far larger than they are.`,
-    body: `<div class="iso-stage eu-stage" tabindex="0" role="group" aria-label="EUV scanner. Hover or use the left and right arrow keys to pick a subsystem; space pauses the motion.">${svg}<span class="eu-sr" role="status" aria-live="polite" data-status></span></div>${list}`,
+    body: `<div class="iso-stage eu-stage" tabindex="0" role="group" aria-label="EUV scanner. Hover or use the left and right arrow keys to pick a subsystem; space takes the machine apart and puts it back together; P pauses the motion.">${svg}<span class="eu-sr" role="status" aria-live="polite" data-status></span></div><div class="eu-controls"><button type="button" class="eu-apart" data-apart>Take apart</button></div>${list}`,
   });
 
 const kitSource = strip("kit/iso-kit.mjs");
