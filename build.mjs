@@ -285,7 +285,7 @@ SYS = "if";
 // ---------------------------------------------------------------- 05 illuminator
 SYS = "illum";
 housing("illum", ILLUM, { sys: "illum", right: "open" });
-for (const x of [-60, 88]) for (const y of [ILLUM[2] + 4, ILLUM[3] - 4]) {
+for (const x of [-60, 68]) for (const y of [ILLUM[2] + 4, ILLUM[3] - 4]) {
   disc("illum.column", zF(x, y, 0), 0, 3, 6, { tone: "lo" }, { sys: "illum" });
   disc("illum.column", zF(x, y, 0), 3, ILLUM[4], 3.4, { tone: "mid" }, { sys: "illum" });
 }
@@ -545,53 +545,6 @@ const CHIEF = {
 };
 const lightSvg = (id) => `<g class="eu-light" data-light="${id}">${LIGHTS[id].join("")}<path class="eu-chief" d="${path3(CHIEF[id])}"/><path class="eu-pulse" data-pulse="${id}" d="${path3(CHIEF[id])}"/></g>`;
 
-// ---------------------------------------------------------------- settle and assemble
-A.settle(R, P);
-R.items.sort((a, b) => a.key - b.key);
-// The chucks move under the PO and the bridge: draw them after what lies behind them (the base, the back posts)
-// and before everything above or in front of them.
-const indexOf = (pred) => R.items.reduce((best, item, index) => (pred(item) ? index : best), -1);
-const behindChucks = (it) => it.name === "stages.base" || (/^(po\.post|po\.airmount|metro\.post)$/.test(it.name) && it.where[1] < 0);
-const overChucks = (it) => !behindChucks(it) && /^(po\.(post|airmount|crossbeam|floor|dgl|left|back|rib)|metro\.|stages\.grid|handler\.robot)/.test(it.name);
-let stageSlot = indexOf(behindChucks);
-{
-  const moved = R.items.filter((it, i) => i < stageSlot && overChucks(it));
-  const rest = R.items.filter((it, i) => !(i < stageSlot && overChucks(it)));
-  const at0 = rest.findIndex((it) => it === R.items[stageSlot]);
-  R.items.splice(0, R.items.length, ...rest.slice(0, at0 + 1), ...moved, ...rest.slice(at0 + 1));
-  stageSlot = at0;
-}
-
-// Moving parts live in reserved slots of the settled order.
-const slots = new Map();
-const addSlot = (index, svg) => slots.set(index, (slots.get(index) ?? "") + svg);
-const inside = (prefixes) => indexOf((it) => prefixes.some((p) => it.name === p || it.name.startsWith(p + ".")) && !/\.(post|top\.front|top\.right|crossbeam|airmount|column|right)$/.test(it.name));
-
-// droplets, the laser hit and the source light, inside the vessel after the collector and generator
-const DROPS = 9;
-addSlot(inside(["collector", "tin", "final.focus", "vessel.back", "vessel.left", "vessel.floor", "if.cone"]),
-  lightSvg("src") +
-  `<g data-part="laser-hit"><path class="eu-laser" d="${path3([[PL[0], Y0, FFOC.z1], PLASMA])}"/></g>` +
-  `<g data-part="drops">${Array.from({ length: DROPS }, () => `<ellipse class="eu-drop" rx="1.1" ry="1.1" cx="0" cy="0"/>`).join("")}</g>` +
-  `<defs><radialGradient id="eu-plasma-grad"><stop offset="0" class="eu-st0"/><stop offset="0.3" class="eu-st1"/><stop offset="1" class="eu-st2"/></radialGradient></defs>` +
-  `<g data-part="plasma"><circle class="eu-plasma-halo" cx="${f2(at(PLASMA)[0])}" cy="${f2(at(PLASMA)[1])}" r="18"/><circle class="eu-plasma-core" cx="${f2(at(PLASMA)[0])}" cy="${f2(at(PLASMA)[1])}" r="2.6"/></g>`);
-
-// light: after the last item inside each housing, before its front frame
-addSlot(inside(["illum.ffm", "illum.pfm", "illum.mc", "illum.mg", "illum.back", "illum.left", "illum.floor"]), lightSvg("ill") +
-  `<g data-part="if-glow"><circle class="eu-if" cx="${f2(at(xz(IFP))[0])}" cy="${f2(at(xz(IFP))[1])}" r="2.2"/></g>`);
-addSlot(inside(["po.m1", "po.m2", "po.m3", "po.m4", "po.m5", "po.m6", "po.back", "po.left", "po.floor", "po.dgl"]), lightSvg("po"));
-
-// reticle carriage on top: built at rest over the reticle, moved along x
-const CAR = { x0: RX - 26, x1: RX + 26, y0: RAIL_Y[0] - 2, y1: RAIL_Y[1] + 6, z0: PO[5] + 6, z1: PO[5] + 14 };
-const reticleSvg = [
-  S(k.slabOf({ x: RX - 15.2, y: Y0 - 15.2, w: 30.4, d: 30.4, r: 0.5 }, RZ, 1.3, P, 2), { tone: "hi", lit: false }),
-  S(k.slabOf({ x: RX - 13, y: Y0 - 13, w: 26, d: 26, r: 0.4 }, RZ + 1.3, CAR.z0 - RZ - 1.3, P, 2), { tone: "lo" }),
-  S(k.slabOf({ x: CAR.x0, y: CAR.y0, w: CAR.x1 - CAR.x0, d: CAR.y1 - CAR.y0, r: 2 }, CAR.z0, CAR.z1 - CAR.z0, P, 3, 0.5), { tone: "hi", inner: Ln(k.sideSeam({ x: CAR.x0, y: CAR.y0, w: CAR.x1 - CAR.x0, d: CAR.y1 - CAR.y0, r: 2 }, CAR.z0 + 3, P, 3), { tone: "faint" }) }),
-  Ln(k.planOutline({ x: CAR.x0 + 6, y: CAR.y0 + 6, w: CAR.x1 - CAR.x0 - 12, d: CAR.y1 - CAR.y0 - 12, r: 1.5 }, CAR.z1, P, 3), { tone: "faint" }),
-  Dots(k.corners({ x: CAR.x0, y: CAR.y0, w: CAR.x1 - CAR.x0, d: CAR.y1 - CAR.y0, r: 2 }, 3).map(([x, y]) => at([x, y, CAR.z1])), { size: 0.5 }),
-].join("");
-addSlot(R.items.length - 1, `<g class="it" data-sys="reticle" data-part="reticle-stage">${reticleSvg}</g>`);
-
 // wafer chucks: expose (under the PO) and measure (under the bridge)
 const CHUCK = 33;
 const WAFER_R = M.WAFER_MM / 2 / 5;
@@ -622,7 +575,60 @@ function chuckSvg(cx, id) {
   parts.splice(4 + 2, 0, ...heads.slice(2));
   return parts.join("");
 }
+// The chucks are drawn live in the slot of this item. Its shape is the whole space they sweep: stepping under the
+// lens, rastering under the bridge and trading places along two lanes, so the settled order holds wherever they are.
+put("stages.chucks", [(WX + MEAS_X) / 2, Y0, 40], "", [record(A.box([WX - 30 - CHUCK, Y0 - 30 - CHUCK, BASE_H], [MEAS_X + 26 + CHUCK, Y0 + 30 + CHUCK, WZ], { name: "stages.chucks" }))], { sys: "stages" });
+
+// ---------------------------------------------------------------- settle and assemble
+A.settle(R, P);
+R.items.sort((a, b) => a.key - b.key);
+const indexOf = (pred) => R.items.reduce((best, item, index) => (pred(item) ? index : best), -1);
+const stageSlot = indexOf((it) => it.name === "stages.chucks");
+
+// Moving parts live in reserved slots of the settled order.
+const slots = new Map();
+const addSlot = (index, svg) => slots.set(index, (slots.get(index) ?? "") + svg);
+const inside = (prefixes) => indexOf((it) => prefixes.some((p) => it.name === p || it.name.startsWith(p + ".")) && !/\.(post|top\.front|top\.right|crossbeam|airmount|column|right)$/.test(it.name));
+
+// droplets, the laser hit and the source light, inside the vessel after the collector and generator
+const DROPS = 9;
+addSlot(inside(["collector", "tin", "final.focus", "vessel.back", "vessel.left", "vessel.floor", "if.cone"]),
+  lightSvg("src") +
+  `<g data-part="laser-hit"><path class="eu-laser" d="${path3([[PL[0], Y0, FFOC.z1], PLASMA])}"/></g>` +
+  `<g data-part="drops">${Array.from({ length: DROPS }, () => `<ellipse class="eu-drop" rx="1.1" ry="1.1" cx="0" cy="0"/>`).join("")}</g>` +
+  `<defs><radialGradient id="eu-plasma-grad"><stop offset="0" class="eu-st0"/><stop offset="0.3" class="eu-st1"/><stop offset="1" class="eu-st2"/></radialGradient></defs>` +
+  `<g data-part="plasma"><circle class="eu-plasma-halo" cx="${f2(at(PLASMA)[0])}" cy="${f2(at(PLASMA)[1])}" r="18"/><circle class="eu-plasma-core" cx="${f2(at(PLASMA)[0])}" cy="${f2(at(PLASMA)[1])}" r="2.6"/></g>`);
+
+// light: after the last item inside each housing, before its front frame
+addSlot(inside(["illum.ffm", "illum.pfm", "illum.mc", "illum.mg", "illum.back", "illum.left", "illum.floor"]), lightSvg("ill") +
+  `<g data-part="if-glow"><circle class="eu-if" cx="${f2(at(xz(IFP))[0])}" cy="${f2(at(xz(IFP))[1])}" r="2.2"/></g>`);
+addSlot(inside(["po.m1", "po.m2", "po.m3", "po.m4", "po.m5", "po.m6", "po.back", "po.left", "po.floor", "po.dgl"]), lightSvg("po"));
+
+// reticle carriage on top: built at rest over the reticle, moved along x
+const CAR = { x0: RX - 26, x1: RX + 26, y0: RAIL_Y[0] - 2, y1: RAIL_Y[1] + 6, z0: PO[5] + 6, z1: PO[5] + 14 };
+// long-stroke motor blocks on both rails, a bridge between them, and the short-stroke stage on top that
+// trims the reticle's position to nanometres; the clamp under the bridge holds the mask by electrostatics
+const blockOf = (y) => ({ x: CAR.x0, y: y - 2, w: CAR.x1 - CAR.x0, d: 8, r: 1.4 });
+const BRIDGE = { x: CAR.x0 + 3, y: RAIL_Y[0] + 6, w: CAR.x1 - CAR.x0 - 6, d: RAIL_Y[1] - RAIL_Y[0] - 8, r: 1 };
+const SHORT = { x: RX - 18, y: Y0 - 18, w: 36, d: 36, r: 2 };
+const motor = (plan) => S(k.slabOf(plan, CAR.z0, 11, P, 3, 0.4), { tone: "mid", inner: Ln(k.sideSeam(plan, CAR.z0 + 4, P, 3), { tone: "faint" }) }) +
+  Dots(k.corners(plan, 1.6).map(([x, y]) => at([x, y, CAR.z0 + 11])), { size: 0.4 });
+const reticleSvg = [
+  S(k.slabOf({ x: RX - 15.2, y: Y0 - 15.2, w: 30.4, d: 30.4, r: 0.5 }, RZ, 1.3, P, 2), { tone: "hi" }),
+  S(k.slabOf({ x: RX - 13, y: Y0 - 13, w: 26, d: 26, r: 0.4 }, RZ + 1.3, CAR.z0 + 2 - RZ - 1.3, P, 2), { tone: "lo" }),
+  motor(blockOf(RAIL_Y[0])),
+  S(k.slabOf(BRIDGE, CAR.z0 + 2, 7, P, 2, 0.4), { tone: "mid" }),
+  S(k.slabOf(SHORT, CAR.z0 + 9, 4, P, 3, 0.6), { tone: "hi", inner: Ln(k.sideSeam(SHORT, CAR.z0 + 11, P, 3), { tone: "faint" }) }),
+  Ln(k.planOutline(k.insetPlan(SHORT, 4), CAR.z0 + 13, P, 3), { tone: "faint" }),
+  Dots(k.corners(SHORT, 2).map(([x, y]) => at([x, y, CAR.z0 + 13])), { size: 0.5 }),
+  ...byDepth([[SHORT.x + 6, SHORT.y + 6], [SHORT.x + SHORT.w - 6, SHORT.y + 6], [SHORT.x + 6, SHORT.y + SHORT.d - 6], [SHORT.x + SHORT.w - 6, SHORT.y + SHORT.d - 6]])
+    .map(([x, y]) => S(k.cylinder(x, y, 1.6, CAR.z0 + 13, 2.2, P, 16), { tone: "mid" })),
+  motor(blockOf(RAIL_Y[1])),
+].join("");
+addSlot(R.items.length - 1, `<g class="it" data-sys="reticle" data-part="reticle-stage">${reticleSvg}</g>`);
+
 addSlot(stageSlot, `<g class="it" data-sys="stages" data-part="chuck-a">${chuckSvg(WX, "a")}</g><g class="it" data-sys="stages" data-part="chuck-b">${chuckSvg(MEAS_X, "b")}</g>` +
+  `<g data-part="level-beams">${Ln(path3([[LS.pro + 6, Y0, LS.z + 2], [MEAS_X, Y0, WZ + 0.05], [LS.det - 6, Y0, LS.z + 2]]), { tone: "lit", className: "eu-ls" })}${Dots([at([MEAS_X, Y0, WZ + 0.05])], { size: 0.8, tone: "hi" })}</g>` +
   `<g data-part="slit"><path class="eu-slit" d="${k.onTop([[WX - 0.5, Y0 - mm(13)], [WX + 0.5, Y0 - mm(13)], [WX + 0.5, Y0 + mm(13)], [WX - 0.5, Y0 + mm(13)]], WZ + 0.05, P, true)}"/></g>`);
 
 const groups = R.items.map((item, index) => `<g class="it" data-sys="${item.sys}" data-name="${item.name}">${item.svg}</g>${slots.get(index) ?? ""}`);
@@ -674,7 +680,7 @@ const body =
       { mark: "red", label: "CO2 drive laser pulse, 10.6 µm" },
       { mark: "raised", label: "Twin wafer chucks: one exposes, one is measured" },
     ],
-    caption: `Tin droplets about ${M.DROPLET_UM} µm across leave the generator at about ${M.DROPLET_MS} m/s, ${M.fmt(M.DROPLET_HZ)} a second. A weak pre-pulse flattens each one into a disc; about ${M.PRE_TO_MAIN_US} µs later the main CO2 pulse (${M.CO2_UM} µm, ${M.PULSE_J} J) turns it into a plasma that glows at ${M.LAMBDA_NM} nm (${M.fmt(M.PHOTON_EV, 1)} eV photons). The collector focuses about ${M.P_IF} W to the intermediate focus. Air and glass both absorb this light, so everything runs in vacuum with a little hydrogen, and every optic is a mirror coated with about ${M.LAYERS} molybdenum and silicon layer pairs, each reflecting about ${Math.round(M.R_MIRROR * 100)}%. After ${M.REFLECTIONS} more reflections about ${M.fmt(M.P_WAFER, 1)} W reaches the wafer. The mask is lit 6° off normal, and the projection mirrors shrink its pattern 4:1, so the reticle stage scans four times as fast as the wafer stage and in the opposite direction. To give the resist ${M.DOSE_MJ_CM2} mJ/cm² through a ${M.FIELD_MM.slit} mm slit, the wafer moves at about ${M.fmt(M.WAFER_SPEED, 2)} m/s and the reticle at about ${M.fmt(M.RETICLE_SPEED, 2)} m/s; one ${M.FIELD_MM.slit} × ${M.FIELD_MM.scan} mm field takes ${Math.round(M.FIELD_SCAN_MS)} ms and about ${M.fmt(Math.round(M.PULSES_PER_FIELD / 100) * 100)} pulses. Motion is slowed: the source about 100,000 times, the stages about 4 times. Droplets are drawn far larger than they are.`,
+    caption: `Tin droplets about ${M.DROPLET_UM} µm across leave the generator at about ${M.DROPLET_MS} m/s, ${M.fmt(M.DROPLET_HZ)} a second. A weak pre-pulse flattens each one into a disc; about ${M.PRE_TO_MAIN_US} µs later the main CO2 pulse (${M.CO2_UM} µm, ${M.PULSE_J} J) turns it into a plasma that glows at ${M.LAMBDA_NM} nm (${M.fmt(M.PHOTON_EV, 1)} eV photons). The collector focuses about ${M.P_IF} W to the intermediate focus. Air and glass both absorb this light, so everything runs in vacuum with a little hydrogen, and every optic is a mirror coated with about ${M.LAYERS} molybdenum and silicon layer pairs, each reflecting about ${Math.round(M.R_MIRROR * 100)}%. After ${M.REFLECTIONS} more reflections about ${M.fmt(M.P_WAFER, 1)} W reaches the wafer. While one wafer is exposed, the other chuck carries the next wafer under the metrology bridge, where a level sensor maps its height and an alignment sensor finds its marks; then the two chucks trade places. Masking blades shut the light between fields. The mask is lit 6° off normal, and the projection mirrors shrink its pattern 4:1, so the reticle stage scans four times as fast as the wafer stage and in the opposite direction. To give the resist ${M.DOSE_MJ_CM2} mJ/cm² through a ${M.FIELD_MM.slit} mm slit, the wafer moves at about ${M.fmt(M.WAFER_SPEED, 2)} m/s and the reticle at about ${M.fmt(M.RETICLE_SPEED, 2)} m/s; one ${M.FIELD_MM.slit} × ${M.FIELD_MM.scan} mm field takes ${Math.round(M.FIELD_SCAN_MS)} ms and about ${M.fmt(Math.round(M.PULSES_PER_FIELD / 100) * 100)} pulses. Motion is slowed: the source about 100,000 times, the stages about 4 times. Droplets are drawn far larger than they are.`,
     body: `<div class="iso-stage eu-stage" tabindex="0" role="group" aria-label="EUV scanner. Hover or use the left and right arrow keys to pick a subsystem; space pauses the motion.">${svg}<span class="eu-sr" role="status" aria-live="polite" data-status></span></div>${list}`,
   });
 

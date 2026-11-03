@@ -30,6 +30,7 @@ const fields = { a: fieldEls("a"), b: fieldEls("b") };
 const slit = $("[data-part=slit]");
 const rema = ["a", "b"].map((id) => stage.querySelector(`[data-name="illum.rema.${id}"]`));
 const poLight = stage.querySelector('[data-light="po"]');
+const levelBeams = $("[data-part=level-beams]");
 const pulseLengths = pulses.map((p) => p.getTotalLength());
 const pulseStarts = pulseLengths.map((_, i) => pulseLengths.slice(0, i).reduce((a, b) => a + b, 0));
 const pulseTotal = pulseLengths.reduce((a, b) => a + b, 0);
@@ -268,6 +269,8 @@ function tick(now) {
   rema[1].setAttribute("transform", translateAlong(P, [-2.4 * shut, 0, 0]));
   poLight.style.opacity = ((0.7 + 0.3 * plasma) * (1 - 0.85 * shut)).toFixed(3);
   slit.style.opacity = (1 - shut).toFixed(3);
+  // the level sensor goes dark while the chucks trade places, and lights again on the new wafer
+  levelBeams.style.opacity = swapping ? (1 - Math.sin(Math.PI * Math.min(1, (t - WAFER_TIME) / SWAP))).toFixed(3) : "1";
 
   // fields: done, now, waiting
   const fe = fields[expose];
