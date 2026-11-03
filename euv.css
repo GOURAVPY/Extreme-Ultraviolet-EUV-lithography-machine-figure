@@ -28,6 +28,7 @@
 /* colours the photo shows: water hoses and valve handles, black service hoses and cables, a stop button, a warning label */
 .iso { --eu-water: #5b9be6; --eu-black: #2b2b2b; --eu-stop: #ff5a52; --eu-warn: #f2c94c; --eu-pink: #e65bb0; }
 .iso[data-theme="light"] { --eu-water: #2f6fc4; --eu-black: #3a3a3a; --eu-stop: #d9302b; --eu-warn: #d9a400; --eu-pink: #c2378c; }
+.iso-swatch[data-mark="blue"] path { stroke: var(--eu-water); }
 .eu-water { --tint: var(--eu-water); }
 .eu-black { --tint: var(--eu-black); }
 .eu-stop { --tint: var(--eu-stop); }
