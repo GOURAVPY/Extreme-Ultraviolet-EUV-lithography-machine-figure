@@ -8,9 +8,9 @@ const status = stage.querySelector("[data-status]");
 const still = matchMedia("(prefers-reduced-motion: reduce)");
 const $ = (sel) => stage.querySelector(sel);
 
-// Two clocks: the source runs about 100,000 times slower than life, the stages about 8 times.
+// Two clocks: the source runs about 100,000 times slower than life, the stages about 4 times.
 const SRC_PERIOD = 2.0; // display seconds per 20 µs droplet cycle
-const STAGE_SLOW = 8;
+const STAGE_SLOW = 4;
 const SCAN = (FIELD_SCAN_MS / 1000) * STAGE_SLOW; // display seconds per field scan
 const STEP = 0.1 * STAGE_SLOW; // display seconds per step between fields
 const SWAP = 2.4; // display seconds for the chucks to trade places
@@ -28,6 +28,8 @@ const chucks = { a: $("[data-part=chuck-a]"), b: $("[data-part=chuck-b]") };
 const fieldEls = (id) => [...stage.querySelectorAll(`[data-fields="${id}"] .eu-field`)];
 const fields = { a: fieldEls("a"), b: fieldEls("b") };
 const slit = $("[data-part=slit]");
+const rema = ["a", "b"].map((id) => stage.querySelector(`[data-name="illum.rema.${id}"]`));
+const poLight = stage.querySelector('[data-light="po"]');
 const pulseLengths = pulses.map((p) => p.getTotalLength());
 const pulseStarts = pulseLengths.map((_, i) => pulseLengths.slice(0, i).reduce((a, b) => a + b, 0));
 const pulseTotal = pulseLengths.reduce((a, b) => a + b, 0);
@@ -138,7 +140,9 @@ stage.addEventListener("keydown", (e) => {
 stage.addEventListener("focus", () => { status.textContent = picked ? NAMES[picked] : "running"; });
 
 // ------------------------------------------------------------------ the frame
-let clock = 0;
+// start part way through a wafer (or at ?t=seconds, for checking a moment)
+const startAt = Number(new URLSearchParams(location.search).get("t"));
+let clock = Number.isFinite(startAt) && startAt > 0 ? startAt : 0.4 * (DATA.fields.length * ((FIELD_SCAN_MS / 1000) * STAGE_SLOW + 0.1 * STAGE_SLOW));
 let srcClock = 0;
 let tourClock = 0;
 const TOUR_STEP = 4.5;
@@ -220,7 +224,7 @@ function tick(now) {
     p.style.opacity = (0.9 * pulseOn).toFixed(3);
     p.style.strokeDashoffset = (pulseStarts[i] - travel * pulseTotal).toFixed(1);
   });
-  for (const l of lights) l.style.opacity = (0.7 + 0.3 * plasma).toFixed(3);
+  for (const l of lights) if (l !== poLight) l.style.opacity = (0.7 + 0.3 * plasma).toFixed(3);
   ifGlow.style.opacity = (0.45 + 0.55 * burst(mainAge - 0.08, 0.06, 0.3)).toFixed(3);
 
   // stages: one wafer of fields, then the chucks trade places
@@ -256,8 +260,14 @@ function tick(now) {
     place(measure, dx + meas.x - (dx + meas.x) * s, meas.y * (1 - s) - lane);
     if (chucks[expose].parentNode.lastElementChild !== chucks[expose] && chucks[measure].nextElementSibling !== chucks[expose]) chucks[measure].after(chucks[expose]);
   }
-  carriage.setAttribute("transform", translateAlong(P, [swapping ? exp.ret : exp.ret, 0, 0]));
-  slit.style.opacity = exp.scanning && !swapping ? 1 : 0;
+  carriage.setAttribute("transform", translateAlong(P, [exp.ret, 0, 0]));
+  // masking blades: open for the scan, shut while the stage steps so no light reaches the next field early
+  const local = swapping ? STEP : (t % PER_FIELD);
+  const shut = swapping ? 1 : 1 - smooth(0, 0.06, local) * (1 - smooth(SCAN - 0.06, SCAN, local));
+  rema[0].setAttribute("transform", translateAlong(P, [2.4 * shut, 0, 0]));
+  rema[1].setAttribute("transform", translateAlong(P, [-2.4 * shut, 0, 0]));
+  poLight.style.opacity = ((0.7 + 0.3 * plasma) * (1 - 0.85 * shut)).toFixed(3);
+  slit.style.opacity = (1 - shut).toFixed(3);
 
   // fields: done, now, waiting
   const fe = fields[expose];

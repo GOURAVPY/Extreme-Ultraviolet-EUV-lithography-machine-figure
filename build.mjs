@@ -77,7 +77,7 @@ const R = A.recorder(P);
 const record = R.solid;
 let SYS = "frame";
 function put(name, ref, svg, shapes = [], { bias = 0, sys = SYS, ...rest } = {}) {
-  return R.put({ name, at: ref, bias, svg, shapes, piece: "machine", sys, ...rest });
+  return R.put({ name, at: ref, where: ref, bias, svg, shapes, piece: "machine", sys, ...rest });
 }
 function box(name, [x0, y0, z0], [x1, y1, z1], style = {}, { r = 0.6, steps = 2, bevel = 0, extra = "", inner = "", bias = 0, ground = false, sys } = {}) {
   const plan = { x: x0, y: y0, w: x1 - x0, d: y1 - y0, r };
@@ -449,11 +449,11 @@ box("handler.foup.handle", [LP.x + 6, LP.y + 18, 62], [LP.x + LP.w - 6, LP.y + L
   disc("handler.robot.base", zF(RB[0], RB[1], 0), 0, 14, 8, { tone: "mid" }, { sys: "handler", inner: Ln(G.arcOf(zF(RB[0], RB[1], 0), 10, 8, P), { tone: "faint" }) });
   disc("handler.robot.column", zF(RB[0], RB[1], 0), 14, 36, 4.2, { tone: "hi" }, { sys: "handler" });
   disc("handler.robot.shoulder", zF(RB[0], RB[1], 0), 36, 40, 6, { tone: "mid" }, { sys: "handler" });
-  box("handler.robot.arm", [326, RB[1] - 3, 40], [RB[0] + 4, RB[1] + 3, 43.5], { tone: "hi" }, { sys: "handler", r: 2.5, steps: 3 });
-  disc("handler.robot.elbow", zF(328, RB[1], 0), 43.5, 46.5, 4, { tone: "mid" }, { sys: "handler" });
-  box("handler.robot.hand", [312, RB[1] - 2.5, 46.5], [330, RB[1] + 2.5, 48.5], { tone: "hi" }, { sys: "handler", r: 1.5, steps: 3 });
-  box("handler.robot.palm", [306, RB[1] - 5, 46.5], [312, RB[1] + 5, 48.5], { tone: "mid" }, { sys: "handler", r: 0.6 });
-  for (const dy of [-5, 3]) box("handler.robot.fork", [298, RB[1] + dy, 46.5], [306, RB[1] + dy + 2, 47.5], { tone: "hi" }, { sys: "handler", r: 0.4 });
+  box("handler.robot.arm", [RB[0] - 3, RB[1] - 22, 40], [RB[0] + 3, RB[1] + 4, 43.5], { tone: "hi" }, { sys: "handler", r: 2.5, steps: 3 });
+  disc("handler.robot.elbow", zF(RB[0], RB[1] - 19, 0), 43.5, 46.5, 4, { tone: "mid" }, { sys: "handler" });
+  box("handler.robot.hand", [RB[0], RB[1] - 21.5, 46.5], [RB[0] + 8, RB[1] - 16.5, 48.5], { tone: "hi" }, { sys: "handler", r: 1.5, steps: 3 });
+  box("handler.robot.palm", [RB[0] + 8, RB[1] - 24, 46.5], [RB[0] + 12, RB[1] - 14, 48.5], { tone: "mid" }, { sys: "handler", r: 0.6 });
+  for (const dy of [-24, -16]) box("handler.robot.fork", [RB[0] + 12, RB[1] + dy, 46.5], [LL.x - 0.4, RB[1] + dy + 2, 47.5], { tone: "hi" }, { sys: "handler", r: 0.4 });
 }
 // reticle library and hand-off arm on a shelf off the PO's right posts
 const SHELF = { x: PO[1], y: PO[2] + 4, w: 32, d: PO[3] - PO[2] - 4, r: 1 };
@@ -548,7 +548,19 @@ const lightSvg = (id) => `<g class="eu-light" data-light="${id}">${LIGHTS[id].jo
 // ---------------------------------------------------------------- settle and assemble
 A.settle(R, P);
 R.items.sort((a, b) => a.key - b.key);
+// The chucks move under the PO and the bridge: draw them after what lies behind them (the base, the back posts)
+// and before everything above or in front of them.
 const indexOf = (pred) => R.items.reduce((best, item, index) => (pred(item) ? index : best), -1);
+const behindChucks = (it) => it.name === "stages.base" || (/^(po\.post|po\.airmount|metro\.post)$/.test(it.name) && it.where[1] < 0);
+const overChucks = (it) => !behindChucks(it) && /^(po\.(post|airmount|crossbeam|floor|dgl|left|back|rib)|metro\.|stages\.grid|handler\.robot)/.test(it.name);
+let stageSlot = indexOf(behindChucks);
+{
+  const moved = R.items.filter((it, i) => i < stageSlot && overChucks(it));
+  const rest = R.items.filter((it, i) => !(i < stageSlot && overChucks(it)));
+  const at0 = rest.findIndex((it) => it === R.items[stageSlot]);
+  R.items.splice(0, R.items.length, ...rest.slice(0, at0 + 1), ...moved, ...rest.slice(at0 + 1));
+  stageSlot = at0;
+}
 
 // Moving parts live in reserved slots of the settled order.
 const slots = new Map();
@@ -610,7 +622,6 @@ function chuckSvg(cx, id) {
   parts.splice(4 + 2, 0, ...heads.slice(2));
   return parts.join("");
 }
-const stageSlot = indexOf((it) => it.name === "stages.base" || it.name === "po.back" || it.name === "po.left" || it.name === "po.floor");
 addSlot(stageSlot, `<g class="it" data-sys="stages" data-part="chuck-a">${chuckSvg(WX, "a")}</g><g class="it" data-sys="stages" data-part="chuck-b">${chuckSvg(MEAS_X, "b")}</g>` +
   `<g data-part="slit"><path class="eu-slit" d="${k.onTop([[WX - 0.5, Y0 - mm(13)], [WX + 0.5, Y0 - mm(13)], [WX + 0.5, Y0 + mm(13)], [WX - 0.5, Y0 + mm(13)]], WZ + 0.05, P, true)}"/></g>`);
 
@@ -663,7 +674,7 @@ const body =
       { mark: "red", label: "CO2 drive laser pulse, 10.6 µm" },
       { mark: "raised", label: "Twin wafer chucks: one exposes, one is measured" },
     ],
-    caption: `Tin droplets about ${M.DROPLET_UM} µm across leave the generator at about ${M.DROPLET_MS} m/s, ${M.fmt(M.DROPLET_HZ)} a second. A weak pre-pulse flattens each one into a disc; about ${M.PRE_TO_MAIN_US} µs later the main CO2 pulse (${M.CO2_UM} µm, ${M.PULSE_J} J) turns it into a plasma that glows at ${M.LAMBDA_NM} nm (${M.fmt(M.PHOTON_EV, 1)} eV photons). The collector focuses about ${M.P_IF} W to the intermediate focus. Air and glass both absorb this light, so everything runs in vacuum with a little hydrogen, and every optic is a mirror coated with about ${M.LAYERS} molybdenum and silicon layer pairs, each reflecting about ${Math.round(M.R_MIRROR * 100)}%. After ${M.REFLECTIONS} more reflections about ${M.fmt(M.P_WAFER, 1)} W reaches the wafer. The mask is lit 6° off normal, and the projection mirrors shrink its pattern 4:1, so the reticle stage scans four times as fast as the wafer stage and in the opposite direction. To give the resist ${M.DOSE_MJ_CM2} mJ/cm² through a ${M.FIELD_MM.slit} mm slit, the wafer moves at about ${M.fmt(M.WAFER_SPEED, 2)} m/s and the reticle at about ${M.fmt(M.RETICLE_SPEED, 2)} m/s; one ${M.FIELD_MM.slit} × ${M.FIELD_MM.scan} mm field takes ${Math.round(M.FIELD_SCAN_MS)} ms and about ${M.fmt(Math.round(M.PULSES_PER_FIELD / 100) * 100)} pulses. Motion is slowed: the source about 100,000 times, the stages about 8 times. Droplets are drawn far larger than they are.`,
+    caption: `Tin droplets about ${M.DROPLET_UM} µm across leave the generator at about ${M.DROPLET_MS} m/s, ${M.fmt(M.DROPLET_HZ)} a second. A weak pre-pulse flattens each one into a disc; about ${M.PRE_TO_MAIN_US} µs later the main CO2 pulse (${M.CO2_UM} µm, ${M.PULSE_J} J) turns it into a plasma that glows at ${M.LAMBDA_NM} nm (${M.fmt(M.PHOTON_EV, 1)} eV photons). The collector focuses about ${M.P_IF} W to the intermediate focus. Air and glass both absorb this light, so everything runs in vacuum with a little hydrogen, and every optic is a mirror coated with about ${M.LAYERS} molybdenum and silicon layer pairs, each reflecting about ${Math.round(M.R_MIRROR * 100)}%. After ${M.REFLECTIONS} more reflections about ${M.fmt(M.P_WAFER, 1)} W reaches the wafer. The mask is lit 6° off normal, and the projection mirrors shrink its pattern 4:1, so the reticle stage scans four times as fast as the wafer stage and in the opposite direction. To give the resist ${M.DOSE_MJ_CM2} mJ/cm² through a ${M.FIELD_MM.slit} mm slit, the wafer moves at about ${M.fmt(M.WAFER_SPEED, 2)} m/s and the reticle at about ${M.fmt(M.RETICLE_SPEED, 2)} m/s; one ${M.FIELD_MM.slit} × ${M.FIELD_MM.scan} mm field takes ${Math.round(M.FIELD_SCAN_MS)} ms and about ${M.fmt(Math.round(M.PULSES_PER_FIELD / 100) * 100)} pulses. Motion is slowed: the source about 100,000 times, the stages about 4 times. Droplets are drawn far larger than they are.`,
     body: `<div class="iso-stage eu-stage" tabindex="0" role="group" aria-label="EUV scanner. Hover or use the left and right arrow keys to pick a subsystem; space pauses the motion.">${svg}<span class="eu-sr" role="status" aria-live="polite" data-status></span></div>${list}`,
   });
 
