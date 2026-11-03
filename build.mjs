@@ -100,9 +100,9 @@ function put(name, ref, svg, shapes = [], { bias = 0, sys = SYS, ...rest } = {})
   const piece = pieceOf(name);
   return R.put({ name, at: ref, where: ref, bias, svg, shapes, piece, move: PIECES[piece], sys, ...rest });
 }
-function box(name, [x0, y0, z0], [x1, y1, z1], style = {}, { r = 0.6, steps = 2, bevel = 0, extra = "", inner = "", bias = 0, ground = false, sys } = {}) {
+function box(name, [x0, y0, z0], [x1, y1, z1], style = {}, { r = 0.6, steps = 2, bevel = 0, extra = "", inner = "", bias = 0, ground = false, sys, owner } = {}) {
   const plan = { x: x0, y: y0, w: x1 - x0, d: y1 - y0, r };
-  const shape = record(A.slab(plan, z0, z1 - z0, { name, ...(ground ? { ground: true } : {}) }, steps));
+  const shape = record(A.slab(plan, z0, z1 - z0, { name, ...(ground ? { ground: true } : {}), ...(owner ? { owner } : {}) }, steps));
   put(name, [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2], S(k.slabOf(plan, z0, z1 - z0, P, steps, bevel), { tone: "mid", ...style, inner }) + extra, [shape], { bias, sys });
   return shape;
 }
@@ -128,16 +128,17 @@ const PIPES = [];
 const ARM_X = [];
 // Looked at 8x: the floor slab counts as a rod, but these lines end on blocks standing well inside it.
 const CROWD_OK = [["vac.h2.line", "stand.fab"]];
-function pipe(name, points, r, { tone = "mid", bend = 0, flanges = [true, true], maxLength = 18, rings, limp = false, bias = 0.02, sys, free = [false, false] } = {}) {
+function pipe(name, points, r, { tone = "mid", bend = 0, flanges = [true, true], maxLength = 18, rings, limp = false, bias = 0.02, sys, free = [false, false], bundle, className } = {}) {
   const route = G.fillet(points, Math.max(bend || r * 2.6, 3), 10, { P, tube: r });
   const total = G.pathLength(route);
   const FL = Math.max(1.2, r * 0.6);
   const gaps = [...(flanges[0] ? [[0, FL]] : []), ...(flanges[1] ? [[total - FL, total]] : [])];
   const piece = pieceOf(name);
-  R.route(name, route, r, { gaps, limp, piece, move: PIECES[piece], free });
+  R.route(name, route, r, { gaps, limp, piece, move: PIECES[piece], free, ...(bundle ? { bundle } : {}) });
   PIPES.push(name);
+  const skin = (svg) => (className ? `<g class="${className}">${svg}</g>` : svg);
   tubePieces(route, r, P, { maxLength, spacing: Math.max(0.6, Math.min(1.6, r)), gaps, ...(rings ? { rings } : {}) }).forEach((piece, index) =>
-    put(`${name}:${index}`, piece.mid, tubeSvg(piece, { tone }), [A.tube(piece.points, piece.radii)], { bias, sys, route: name }),
+    put(`${name}:${index}`, piece.mid, skin(tubeSvg(piece, { tone })), [A.tube(piece.points, piece.radii, bundle ? { bundle } : {})], { bias, sys, route: name }),
   );
   [0, 1].forEach((end) => {
     if (!flanges[end]) return;
@@ -604,6 +605,261 @@ function chuckSvg(cx, id) {
 // The chucks are drawn live in the slot of this item. Its shape is the whole space they sweep: stepping under the
 // lens, rastering under the bridge and trading places along two lanes, so the settled order holds wherever they are.
 put("stages.chucks", [(WX + MEAS_X) / 2, Y0, 40], "", [record(A.box([WX - 30 - CHUCK, Y0 - 30 - CHUCK, BASE_H], [MEAS_X + 26 + CHUCK, Y0 + 30 + CHUCK, WZ], { name: "stages.chucks" }))], { sys: "stages" });
+
+// ---------------------------------------------------------------- 13–15 the outside, after a photo of a real scanner in its fab
+// An open steel frame in tiers. Left: a service platform with railings and a ladder over a tier of tanks, with
+// cabinets, a valve manifold and an electronics cabinet below. Right: a braced bay of hose loops and tall cabinets
+// on top, a valve panel in the middle, a floor cabinet, a sensor head and the water manifold below. Over the
+// optics: a top tier with the cable tray, the exhaust duct and a bulkhead of ports. The front stays open.
+const seen = (n) => G.dot3(n, V) > 0.02;
+const SX = seen([1, 0, 0]) ? 1 : -1; // the end face of a box that faces the viewer
+const bolt = (pts, size = 0.42, tone = "lo") => Dots(pts.map(at), { size, tone });
+const faceY = (y, x0, x1, z0, z1) => path3([[x0, y, z0], [x1, y, z0], [x1, y, z1], [x0, y, z1]], true);
+const tint = (name) => ({ className: `eu-tint eu-${name}` });
+function rod(name, a, b, r, style = {}, options = {}) {
+  const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  return turned(name, G.frameAlong(a, d), [[0, r], [Math.hypot(...d), r]], { tone: "mid", ...style }, options);
+}
+// a diagonal brace between two faces x = xa and x = xb: its round ends are pulled in so their rims just touch
+function brace(name, [xa, y, za], [xb, , zb], r, options = {}) {
+  const len = Math.hypot(xb - xa, zb - za);
+  const c = Math.abs(xb - xa) / len;
+  const e = (r * Math.sqrt(1 - c * c)) / c + 0.05;
+  const u = [(xb - xa) / len, 0, (zb - za) / len];
+  rod(name, [xa + u[0] * e, y, za + u[2] * e], [xb - u[0] * e, y, zb - u[2] * e], r, { tone: "mid" }, options);
+}
+function column(name, x, y, z0, z1, { s = 2.5, sys = SYS, plate = false } = {}) {
+  if (plate) box(`${name}.plate`, [x - 4.5, y - 4.5, z0], [x + 4.5, y + 4.5, z0 + 1], { tone: "lo" }, { sys, r: 0.4, extra: bolt([[-3.3, -3.3], [3.3, -3.3], [-3.3, 3.3], [3.3, 3.3]].map(([dx, dy]) => [x + dx, y + dy, z0 + 1]), 0.4) });
+  const b = plate ? z0 + 1 : z0;
+  box(name, [x - s, y - s, b], [x + s, y + s, z1], { tone: "mid" }, { sys, r: 0.3, bevel: 0.2,
+    extra: bolt([[x - s + 0.9, y + s, z1 - 1.8], [x + s - 0.9, y + s, z1 - 1.8], [x + SX * s, y - s + 0.9, z1 - 1.8], [x + SX * s, y + s - 0.9, z1 - 1.8]], 0.36) });
+}
+function deck(name, x0, x1, y0, y1, z, { t = 6, sys = SYS, grate = true } = {}) {
+  const plan = { x: x0, y: y0, w: x1 - x0, d: y1 - y0, r: 0.6 };
+  const slots = [];
+  if (grate) for (let x = x0 + 5; x + 6 <= x1 - 4; x += 10) for (let y = y0 + 4; y + 2 <= y1 - 3; y += 6) slots.push(k.planOutline({ x, y, w: 6, d: 2, r: 0.5 }, z + t, P, 2));
+  const xe = SX > 0 ? x1 : x0;
+  const edge = [...[0.08, 0.5, 0.92].map((f) => [x0 + (x1 - x0) * f, y1, z + t / 2]), ...[0.15, 0.5, 0.85].map((f) => [xe, y0 + (y1 - y0) * f, z + t / 2])];
+  box(name, [x0, y0, z], [x1, y1, z + t], { tone: "lo" }, { sys, r: 0.6, inner: Ln(k.sideSeam(plan, z + 1.4, P, 2), { tone: "faint" }), extra: Ln(slots.join(""), { tone: "faint" }) + bolt(edge, 0.42) });
+}
+// posts on the deck, a top rail on the posts, and a knee rail and a toe board clamped to their outer faces
+function railing(name, x0, x1, y0, y1, z, { h = 38, sys = SYS, gaps = [] } = {}) {
+  const s = 1.1;
+  const t = 1;
+  const along = (a, b) => { const n = Math.max(1, Math.ceil((b - a) / 26)); return Array.from({ length: n + 1 }, (_, i) => a + ((b - a) * i) / n); };
+  const split = (a, b) => { const out = []; let from = a; for (const [g0, g1] of gaps) { out.push([from, g0]); from = g1; } out.push([from, b]); return out; };
+  const posts = [];
+  for (const y of [y0, y1]) for (const x of along(x0, x1)) posts.push([x, y]);
+  const ends = { [x0]: split(y0, y1), [x1]: [[y0, y1]] };
+  for (const x of [x0, x1]) for (const [a, b] of ends[x]) for (const y of along(a, b)) if (y !== y0 && y !== y1) posts.push([x, y]);
+  for (const [x, y] of posts) box(`${name}.post`, [x - s, y - s, z], [x + s, y + s, z + h], { tone: "mid" }, { sys, r: 0.3 });
+  const clamps = (pts) => bolt(pts, 0.32);
+  for (const [y, out] of [[y0, -1], [y1, 1]]) {
+    box(`${name}.top`, [x0 - s, y - s, z + h], [x1 + s, y + s, z + h + 2], { tone: "hi" }, { sys, r: 0.4 });
+    const ya = out > 0 ? y + s : y - s - t;
+    const xs = posts.filter((p) => p[1] === y).map((p) => p[0]);
+    for (const [z0, z1, part] of [[z + h / 2 - 1, z + h / 2 + 1, "knee"], [z, z + 4, "toe"]])
+      box(`${name}.${part}`, [x0 - s, ya, z0], [x1 + s, ya + t, z1], { tone: part === "toe" ? "mid" : "hi" }, { sys, r: 0.3, extra: out > 0 ? clamps(xs.map((x) => [x, ya + t, (z0 + z1) / 2])) : "" });
+  }
+  for (const [x, out] of [[x0, -1], [x1, 1]]) {
+    for (const [a, b] of ends[x]) {
+      box(`${name}.top`, [x - s, a === y0 ? a + s : a - s, z + h], [x + s, b === y1 ? b - s : b + s, z + h + 2], { tone: "hi" }, { sys, r: 0.4 });
+      const xa = out > 0 ? x + s : x - s - t;
+      for (const [z0, z1, part] of [[z + h / 2 - 1, z + h / 2 + 1, "knee"], [z, z + 4, "toe"]])
+        box(`${name}.${part}`, [xa, a === y0 ? a - s - t : a - s, z0], [xa + t, b === y1 ? b + s + t : b + s, z1], { tone: part === "toe" ? "mid" : "hi" }, { sys, r: 0.3 });
+    }
+  }
+}
+// a sheet-steel cabinet on a plinth: doors, louvres, hinges and handles on the front face y = y1
+function cabinet(name, [x0, y0, z0], [x1, y1, z1], { doors = 1, sys = SYS, warn = false, stop = false, louvres = 4 } = {}) {
+  const plan = { x: x0, y: y0, w: x1 - x0, d: y1 - y0, r: 0.8 };
+  box(`${name}.plinth`, [x0 + 1.5, y0 + 1.5, z0], [x1 - 1.5, y1 - 1.5, z0 + 3], { tone: "lo" }, { sys, r: 0.4 });
+  const zb = z0 + 3;
+  const yf = y1 + 0.05;
+  const w = (x1 - x0) / doors;
+  const lines = [];
+  const hinges = [];
+  for (let i = 0; i < doors; i++) {
+    const d0 = x0 + i * w + 1.6;
+    const d1 = x0 + (i + 1) * w - 1.6;
+    lines.push(faceY(yf, d0, d1, zb + 2, z1 - 2));
+    for (let j = 0; j < louvres; j++) lines.push(faceY(yf, d0 + 3, d1 - 3, zb + 6 + j * 3.4, zb + 7.4 + j * 3.4));
+    const hx = i % 2 ? d1 - 1 : d0 + 1;
+    hinges.push([hx, yf, zb + 9], [hx, yf, z1 - 9], [hx, yf, (zb + z1) / 2]);
+  }
+  lines.push(faceY(yf, x0 + 4, x0 + 13, z1 - 10, z1 - 6));
+  box(name, [x0, y0, zb], [x1, y1, z1], { tone: "mid" }, { sys, r: 0.8, steps: 2, bevel: 0.5,
+    inner: Ln(k.sideSeam(plan, z1 - 3, P, 2), { tone: "faint" }),
+    extra: Ln(lines.join(""), { tone: "lo" }) + bolt(hinges, 0.55, "mid") + bolt(k.corners(plan, 1.6).map(([x, y]) => [x, y, z1]), 0.42) + bolt([[x0 + 4.8, yf, z1 - 8], [x0 + 12.2, yf, z1 - 8]], 0.3) });
+  for (let i = 0; i < doors; i++) {
+    const hx = i % 2 ? x0 + i * w + 4.5 : x0 + (i + 1) * w - 4.5;
+    const zc = (zb + z1) / 2;
+    box(`${name}.handle`, [hx - 0.8, y1, zc - 6], [hx + 0.8, y1 + 1.6, zc + 6], { tone: "hi" }, { sys, r: 0.3 });
+  }
+  if (warn) box(`${name}.warn`, [x0 + 5, y1, z1 - 22], [x0 + 12, y1 + 0.3, z1 - 15], tint("warn"), { sys, r: 0.2 });
+  if (stop) {
+    const x = x0 + (doors > 1 ? w / 2 : 10);
+    const z = z1 - 16;
+    disc(`${name}.stop.collar`, yF(x, y1, z), 0, 1, 4.6, tint("warn"), { sys });
+    turned(`${name}.stop`, yF(x, y1 + 1, z), [[0, 1.6], [1.4, 1.6], [1.6, 3.4, 1], [2.8, 3.7, 1], [3.6, 2.9, 1], [4, 0.6]], tint("stop"), { sys });
+  }
+}
+// a round dial on a face y = yf: bezel ring, tick dots, a needle from its hub
+function gauge(name, x, yf, z, r = 4, { sys = SYS, needle = 0.7 } = {}) {
+  const F = yF(x, yf, z);
+  const face = yf + 1.45;
+  const tip = [x + (r - 1.7) * Math.cos(needle), face, z + (r - 1.7) * Math.sin(needle)];
+  disc(name, F, 0, 1.4, r, { tone: "hi" }, { sys,
+    extra: Ln(G.circleOf(F, 1.4, r - 0.55, P, 40), { tone: "lo" }) + Dots(G.dotsOf(F, 1.4, r - 1.2, 12, P, { all: true }), { size: 0.24, tone: "lo" }) +
+      Ln(path3([[x, face, z], tip]), { tone: "lo", free: "end" }) + bolt([[x, face, z]], 0.45) });
+}
+// a horizontal pressure vessel on saddles: dished heads, two straps, manways with bolt circles, nozzles on top
+function tank(name, x0, x1, y, zc, r, { sys = SYS, saddles = [0.18, 0.82], nozzles = [], floor = 146, roof = 244 } = {}) {
+  const F = xF(x0, y, zc);
+  const L = x1 - x0;
+  const hd = Math.min(10, r * 0.55);
+  const prof = [[0, r * 0.32], [hd * 0.1, r * 0.6, 1], [hd * 0.3, r * 0.8, 1], [hd * 0.62, r * 0.94, 1], [hd, r], [L - hd, r], [L - hd * 0.62, r * 0.94, 1], [L - hd * 0.3, r * 0.8, 1], [L - hd * 0.1, r * 0.6, 1], [L, r * 0.32]];
+  turned(name, F, prof, { tone: "hi" }, { sys, inner: Ln(G.arcOf(F, hd, r, P) + G.arcOf(F, L - hd, r, P), { tone: "faint" }) });
+  for (const [s0, s1] of [[-1.6, 0], [L, L + 1.6]]) {
+    const out = s0 < 0 ? -1 : 1;
+    const face = seen([out, 0, 0]) ? Dots(G.dotsOf(F, out < 0 ? s0 : s1, r * 0.34, 10, P, { all: true }), { size: 0.34 }) : "";
+    disc(`${name}.manway`, F, s0, s1, r * 0.42, { tone: "mid" }, { sys, owner: name, extra: face });
+  }
+  for (const f of saddles) {
+    const s = L * f;
+    disc(`${name}.strap`, F, s - 1.6, s + 1.6, r + 1.2, { tone: "mid" }, { sys, owner: name, extra: Dots(G.dotsOf(F, s, r + 1.2, 6, P, { fade: [0.05, 0.4] }), { size: 0.3 }) });
+    box(`${name}.saddle`, [x0 + s - 3.4, y - r * 0.62, floor], [x0 + s + 3.4, y + r * 0.62, zc - r - 1.2], { tone: "lo" }, { sys, r: 0.3,
+      extra: bolt([[x0 + s - 2.2, y + r * 0.62, floor + 1.2], [x0 + s + 2.2, y + r * 0.62, floor + 1.2]], 0.34) });
+  }
+  nozzles.forEach((s, j) => {
+    const top = zc + r - 0.3;
+    const N = zF(x0 + s, y, top);
+    turned(`${name}.nozzle`, N, [[0, 2.4], [5, 2.4], [5, 3.8], [6.6, 3.8]], { tone: "mid" }, { sys, owner: name, extra: Dots(G.dotsOf(N, 6.6, 3.2, 6, P, { all: true }), { size: 0.28 }) });
+    pipe(`${name}.line${j}`, [[x0 + s, y, top + 6.6], [x0 + s, y, roof]], 2.2, { sys, maxLength: 24 });
+  });
+}
+
+// ------------- 13 left module: service platform, tanks, cabinets, manifold
+SYS = "deck";
+const LM = { x0: -479, x1: -277, y0: -119, y1: 21 };
+for (const x of [-476, -378, -280]) for (const y of [-116, 18]) {
+  column("deck.left.post", x, y, 0, 140, { plate: true });
+  column("deck.left.post", x, y, 146, 244);
+}
+deck("deck.left.mid", LM.x0, LM.x1, LM.y0, LM.y1, 140);
+deck("deck.left.top", LM.x0, LM.x1, LM.y0, LM.y1, 244);
+railing("deck.left.rail", -474, -282, -114, 16, 250, { gaps: [[-32, -8]] });
+// a ladder up the end, bracketed to both decks
+for (const y of [-30, -10]) {
+  box("deck.ladder.stile", [-484, y - 1.5, 0], [-482, y + 1.5, 290], { tone: "mid" }, { r: 0.3 });
+  for (const z of [141, 245]) box("deck.ladder.bracket", [-482, y - 1.5, z], [-479, y + 1.5, z + 4], { tone: "lo" }, { r: 0.2, extra: bolt([[-480.5, y + 1.5, z + 2]], 0.3) });
+}
+for (let z = 12; z < 286; z += 11) rod("deck.ladder.rung", [-483, -28.5, z], [-483, -11.5, z], 0.75, { tone: "hi" });
+tank("deck.tank.a", -470, -382, -2, 168, 18, { nozzles: [30, 58] });
+tank("deck.tank.b", -374, -286, -2, 168, 18, { nozzles: [28, 60] });
+tank("deck.tank.c", -468, -290, -78, 170, 16, { saddles: [0.12, 0.5, 0.88], nozzles: [38, 88, 138] });
+// exhaust fan box on the platform: the duct over the top tier starts here
+box("deck.exhaust", [-345, -85, 250], [-315, -55, 285], { tone: "mid" }, { r: 1, steps: 2, bevel: 0.4,
+  inner: Ln(k.sideSeam({ x: -345, y: -85, w: 30, d: 30, r: 1 }, 280, P, 2), { tone: "faint" }),
+  extra: Ln(Array.from({ length: 5 }, (_, j) => faceY(-54.95, -340, -320, 256 + j * 4, 257.6 + j * 4)).join(""), { tone: "lo" }) + bolt(k.corners({ x: -345, y: -85, w: 30, d: 30 }, 1.6).map(([x, y]) => [x, y, 285])) });
+SYS = "power";
+cabinet("power.left.cab", [-472, -60, 0], [-450, 14, 128]);
+cabinet("power.left.cab", [-448, -60, 0], [-426, 14, 128]);
+cabinet("power.left.ecab", [-334, -24, 0], [-288, 14, 120], { warn: true });
+for (let i = 0; i < 5; i++) {
+  const x = -326 + i * 6;
+  disc("power.left.gland", yF(x, 14, 10), 0, 1.6, 1.3, { tone: "hi" });
+  disc("power.left.grommet", zF(x, 24, 0), 0, 0.8, 1.9, { tone: "lo" });
+  pipe(`power.left.cable.${i}`, [[x, 15.6, 10], [x, 24, 10], [x, 24, 0.8]], 0.7, { flanges: [false, false], bend: 3, limp: true, className: "eu-tint eu-black" });
+}
+SYS = "cool";
+box("cool.left.manifold", [-424, 0, 0], [-352, 14, 12], { tone: "mid" }, { r: 0.8, steps: 2, bevel: 0.4,
+  inner: Ln(k.sideSeam({ x: -424, y: 0, w: 72, d: 14, r: 0.8 }, 4, P, 2), { tone: "faint" }),
+  extra: bolt(k.corners({ x: -424, y: 0, w: 72, d: 14 }, 1.6).map(([x, y]) => [x, y, 12])) });
+for (let i = 0; i < 6; i++) {
+  const c = -418 + i * 12;
+  turned("cool.left.valve", zF(c, 7, 12), [[0, 3.2], [5, 3.2]], { tone: "hi" }, { inner: Ln(G.arcOf(zF(c, 7, 12), 2.5, 3.2, P), { tone: "faint" }) });
+  box("cool.left.lever", [c - 0.6, 10.1, 14], [c + 0.6, 17, 15.4], tint("water"), { owner: "cool.left.valve", r: 0.3 });
+  pipe(`cool.left.riser.${i}`, [[c, 7, 17], [c, 7, 140]], 1.8, { tone: "hi", maxLength: 30 });
+  if (i < 5) gauge("cool.left.gauge", c + 6, 14, 6, 2.6);
+}
+
+// ------------- 14 right module: hose bay and tall cabinets, valve panel, floor cabinet, sensor head, water manifold
+SYS = "deck";
+for (const x of [428, 528, 628]) for (const y of [-116, 18]) {
+  column("deck.right.post", x, y, 0, 150, { plate: true });
+  column("deck.right.post", x, y, 156, 262);
+  column("deck.right.post", x, y, 268, 414);
+}
+deck("deck.right.low", 425, 631, -119, 21, 150);
+deck("deck.right.mid", 425, 631, -119, 21, 262);
+SYS = "power";
+cabinet("power.right.cab", [500, -40, 0], [570, 14, 120], { doors: 2, warn: true });
+cabinet("power.right.tall", [532, -60, 268], [624, 14, 410], { doors: 2, stop: true, louvres: 6 });
+column("power.sensor.stand", 479, 4, 0, 40, { s: 1.6, plate: true });
+box("power.sensor", [470, -2, 40], [488, 10, 58], { tone: "hi" }, { r: 1, steps: 2, bevel: 0.4,
+  inner: Ln(k.sideSeam({ x: 470, y: -2, w: 18, d: 12, r: 1 }, 54, P, 2), { tone: "faint" }), extra: bolt([[471.6, 10, 56.4], [486.4, 10, 56.4], [471.6, 10, 41.6], [486.4, 10, 41.6]], 0.36) });
+turned("power.sensor.plug", yF(479, 10, 49), [[0, 2.4], [2.4, 2.4], [2.4, 1.7], [5, 1.7]], tint("pink"));
+disc("power.sensor.grommet", zF(479, 24, 0), 0, 0.8, 2, { tone: "lo" });
+pipe("power.sensor.cable", [[479, 15, 49], [479, 24, 49], [479, 24, 0.8]], 0.9, { flanges: [false, false], bend: 4, limp: true, className: "eu-tint eu-black" });
+SYS = "cool";
+for (const [j, x] of [600, 614].entries()) {
+  disc("cool.right.port", zF(x, 6, 0), 0, 1, 4.2, { tone: "lo" });
+  pipe(`cool.right.header.${j}`, [[x, 6, 1], [x, 6, 150]], 2.4, { tone: "hi", maxLength: 30 });
+  [40, 70, 100, 130].forEach((z, i) => {
+    box("cool.right.valve", [x - 3.6, 2.4, z - 3.6], [x + 3.6, 9.6, z + 3.6], { tone: "mid" }, { owner: `cool.right.header.${j}`, r: 0.6, extra: bolt([[x - 2.4, 9.6, z + 2.4], [x + 2.4, 9.6, z - 2.4]], 0.3) });
+    box("cool.right.lever", [x - 0.6, 9.6, z + 1.2], [x + 0.6, 16, z + 2.6], tint("water"), { owner: "cool.right.valve", r: 0.3 });
+    if (j === 0) {
+      const lane = 574.5 + i * 5.5;
+      pipe(`cool.right.hose.${i}`, [[x - 3.6, 6, z], [lane, 6, z], [lane, 6, 150]], 1.4, { bend: 4, className: "eu-tint eu-water" });
+    }
+  });
+}
+box("cool.panel", [436, -40, 156], [620, -36, 258], { tone: "mid" }, { r: 0.4,
+  extra: bolt([0.03, 0.25, 0.5, 0.75, 0.97].flatMap((f) => [[436 + 184 * f, -36, 254.5], [436 + 184 * f, -36, 159.5]]), 0.38) });
+for (let i = 0; i < 7; i++) {
+  const c = 450 + i * 26;
+  gauge("cool.panel.gauge", c, -36, 236, 4.6, { needle: 0.4 + i * 0.3 });
+  for (const z of [206, 176]) {
+    box("cool.panel.valve", [c - 3.5, -36, z - 3.5], [c + 3.5, -30, z + 3.5], { tone: "hi" }, { r: 0.6, extra: bolt([[c - 2.3, -30, z + 2.3], [c + 2.3, -30, z - 2.3]], 0.3) });
+    box("cool.panel.lever", [c + 3.5, -32, z + 1], [c + 10, -30.8, z + 2.4], tint("water"), { owner: "cool.panel.valve", r: 0.3 });
+  }
+  pipe(`cool.panel.hose.${i}`, [[c, -30, 176], [c, -22, 176], [c, -22, 156]], 1.3, { bend: 4, className: "eu-tint eu-water" });
+}
+// the hose bay: X braces front and back, and three rows of hose loops hanging from bars under the top deck
+for (const y of [18, -116]) {
+  brace("cool.bay.brace", [430.5, y + 1.6, 270], [525.5, y, 412], 0.9);
+  brace("cool.bay.brace", [430.5, y - 1.6, 412], [525.5, y, 270], 0.9);
+}
+[-30, -55, -80].forEach((y, j) => {
+  box("cool.bay.bar", [432, y - 2, 410], [524, y + 2, 414], { tone: "mid" }, { r: 0.4 });
+  [[438, 458], [466, 490], [496, 520]].forEach(([xa, xb], n) => {
+    const zl = 300 + ((j * 3 + n * 7) % 5) * 9;
+    pipe(`cool.loop.${j}.${n}`, [[xa, y, 410], [xa, y, zl], [xb, y, zl], [xb, y, 410]], 1.6, { bend: (xb - xa) / 2 - 0.3, limp: true, maxLength: 24, bundle: "bay", className: "eu-tint eu-black" });
+  });
+});
+
+// ------------- 15 top tier over the optics: cable tray, exhaust duct, bulkhead of ports
+SYS = "deck";
+for (const x of [-258, -110, 40, 225]) column("deck.top.post", x, -114, 0, 414, { plate: true });
+deck("deck.top", -262, 425.5, -119, -40, 414, { grate: false });
+deck("deck.right.top", 425.5, 631, -119, 21, 414, { grate: false });
+pipe("deck.duct", [[-330, -70, 285], [-330, -70, 446], [470, -70, 446], [470, -70, 420]], 6, { tone: "hi", bend: 16, maxLength: 40 });
+for (const x of [-200, -40, 120, 300]) box("deck.duct.stand", [x - 3, -74, 420], [x + 3, -66, 440], { tone: "lo" }, { r: 0.3, extra: bolt([[x - 1.8, -66, 421.2], [x + 1.8, -66, 421.2]], 0.3) });
+box("deck.bulkhead", [-70, -118, 420], [70, -114, 488], { tone: "mid" }, { r: 0.4,
+  extra: bolt([0.04, 0.5, 0.96].flatMap((f) => [[-70 + 140 * f, -114, 485], [-70 + 140 * f, -114, 423]]), 0.4) });
+for (const [x, z] of [[-32, 442], [32, 442], [-32, 468], [32, 468]]) {
+  const F = yF(x, -114, z);
+  disc("deck.port", F, 0, 3, 12, { tone: "hi" }, { extra: Dots(G.dotsOf(F, 3, 10.4, 12, P, { all: true }), { size: 0.42 }) });
+  const C = yF(x, -111, z);
+  disc("deck.port.cover", C, 0, 1.4, 8, { tone: "mid" }, { extra: Ln(G.circleOf(C, 1.4, 5.6, P, 40), { tone: "faint" }) + Dots(G.dotsOf(C, 1.4, 7, 8, P, { all: true }), { size: 0.3 }) });
+}
+SYS = "power";
+for (const y of [-112, -94]) box("power.tray.rail", [-240, y, 420], [400, y + 2, 426], { tone: "mid" }, { r: 0.3 });
+for (let x = -230; x <= 390; x += 24) box("power.tray.rung", [x - 1, -110, 420], [x + 1, -94, 421.5], { tone: "lo" }, { r: 0.2 });
+for (const x0 of [-258, 404]) box("power.tray.box", [x0, -114, 420], [x0 + 14, -90, 434], { tone: "mid" }, { r: 0.8, steps: 2, bevel: 0.4,
+  extra: Ln(faceY(-89.95, x0 + 2, x0 + 12, 422, 432), { tone: "lo" }) + bolt([[x0 + 3, -89.95, 423], [x0 + 11, -89.95, 423], [x0 + 3, -89.95, 431], [x0 + 11, -89.95, 431]], 0.32) });
+for (let i = 0; i < 5; i++) pipe(`power.tray.cable.${i}`, [[-244, -108 + i * 3.2, 422.4], [404, -108 + i * 3.2, 422.4]], 0.9, { maxLength: 80, limp: true, bundle: "tray", className: i % 2 ? "eu-tint eu-water" : "eu-tint eu-black" });
 
 // ---------------------------------------------------------------- settle and assemble
 A.settle(R, P);

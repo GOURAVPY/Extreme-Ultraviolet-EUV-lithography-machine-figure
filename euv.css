@@ -25,6 +25,21 @@
   --eu-void: #cfcfcf;
 }
 
+/* colours the photo shows: water hoses and valve handles, black service hoses and cables, a stop button, a warning label */
+.iso { --eu-water: #5b9be6; --eu-black: #2b2b2b; --eu-stop: #ff5a52; --eu-warn: #f2c94c; --eu-pink: #e65bb0; }
+.iso[data-theme="light"] { --eu-water: #2f6fc4; --eu-black: #3a3a3a; --eu-stop: #d9302b; --eu-warn: #d9a400; --eu-pink: #c2378c; }
+.eu-water { --tint: var(--eu-water); }
+.eu-black { --tint: var(--eu-black); }
+.eu-stop { --tint: var(--eu-stop); }
+.eu-warn { --tint: var(--eu-warn); }
+.eu-pink { --tint: var(--eu-pink); }
+.eu-tint .iso-fill, .eu-tint .tb-body { fill: color-mix(in srgb, var(--tint) 62%, var(--anatomy-shade-2)); }
+.eu-tint .iso-top, .eu-tint .tb-shine { fill: color-mix(in srgb, var(--tint) 58%, var(--anatomy-top)); }
+.eu-tint .tb-shade, .eu-tint .iso-shade[data-shade="0"] { fill: color-mix(in srgb, var(--tint) 62%, var(--anatomy-shade-0)); }
+.eu-tint .iso-shade[data-shade="1"] { fill: color-mix(in srgb, var(--tint) 62%, var(--anatomy-shade-1)); }
+.eu-tint .iso-shade[data-shade="2"] { fill: color-mix(in srgb, var(--tint) 62%, var(--anatomy-shade-2)); }
+.eu-tint .iso-shade[data-shade="3"] { fill: color-mix(in srgb, var(--tint) 62%, var(--anatomy-shade-3)); }
+
 .eu-stage { position: relative; outline: none; touch-action: pan-y; }
 .eu-stage:focus-visible { outline: 1px solid var(--anatomy-muted); outline-offset: 6px; }
 .eu-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

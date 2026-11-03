@@ -108,9 +108,9 @@ const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a
 const burst = (age, rise, fall) => (age <= 0 ? 0 : smooth(0, rise, age) * Math.exp(-Math.max(0, age - rise) / fall));
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 
-const SYSTEMS = ["laser", "tin", "source", "if", "illum", "reticle", "po", "stages", "metro", "vac", "handler", "control"];
-const items = Object.fromEntries(SYSTEMS.map((id) => [id, [...stage.querySelectorAll(`.it[data-sys="${id}"]`)]]));
 const buttons = [...document.querySelectorAll("[data-pick]")];
+const SYSTEMS = buttons.map((b) => b.dataset.pick);
+const items = Object.fromEntries(SYSTEMS.map((id) => [id, [...stage.querySelectorAll(`.it[data-sys="${id}"]`)]]));
 
 // ------------------------------------------------------------------ stage plan: serpentine fields, then a swap
 const FIELD_COUNT = DATA.fields.length;
