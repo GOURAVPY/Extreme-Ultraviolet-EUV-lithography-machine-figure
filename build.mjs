@@ -104,6 +104,7 @@ const yF = (x, y, z) => G.frameOf([x, y, z], [0, 1, 0], [1, 0, 0], [0, 0, 1]);
 const xF = (x, y, z) => G.frameOf([x, y, z], [1, 0, 0], [0, 1, 0], [0, 0, 1]);
 
 const PIPES = [];
+const ARM_X = [];
 // Looked at 8x: the floor slab counts as a rod, but these lines end on blocks standing well inside it.
 const CROWD_OK = [["vac.h2.line", "stand.fab"]];
 function pipe(name, points, r, { tone = "mid", bend = 0, flanges = [true, true], maxLength = 18, rings, limp = false, bias = 0.02, sys } = {}) {
@@ -189,6 +190,14 @@ for (const a of AMP) {
     put("laser.seed.panel", [290, plan.y + plan.d, z0 + 15], `<path class="eu-glow-slot" data-amp="seed" d="${path3([[268, plan.y + plan.d + 0.05, z0 + 18], [278, plan.y + plan.d + 0.05, z0 + 18], [278, plan.y + plan.d + 0.05, z0 + 22], [268, plan.y + plan.d + 0.05, z0 + 22]], true)}"/>` + Dots([at([284, plan.y + plan.d + 0.05, z0 + 20]), at([289, plan.y + plan.d + 0.05, z0 + 20]), at([294, plan.y + plan.d + 0.05, z0 + 20])], { size: 0.7, tone: "hi" }), [record(A.box([268, plan.y + plan.d, z0 + 18], [296, plan.y + plan.d + 0.1, z0 + 22], { name: "laser.seed.panel" }))], { bias: 0.2 });
   }
 }
+{
+  const seed = AMP[0];
+  const top = SUB_Z + 4 + seed.h;
+  const plan = { x: seed.x0 + 10, y: LAS_Y - 14, w: 30, d: 20, r: 1.2 };
+  box("laser.prepulse", [plan.x, plan.y, top], [plan.x + plan.w, plan.y + plan.d, top + 9], { tone: "hi" }, { sys: "laser", r: 1.2, steps: 3, bevel: 0.4,
+    inner: Ln(k.sideSeam(plan, top + 4, P, 3), { tone: "faint" }),
+    extra: Dots(k.corners(plan, 2).map(([x, y]) => at([x, y, top + 9])), { size: 0.4 }) });
+}
 // Beam tubes between the stages, at the beam height, then to the turning box under the source.
 for (let i = 0; i < AMP.length - 1; i++) pipe(`laser.tube.${i}`, [[AMP[i].x0, LAS_Y, LAS_Z], [AMP[i + 1].x1, LAS_Y, LAS_Z]], 3, { sys: "laser", tone: "mid" });
 const TURN = { x: -200, y: LAS_Y, z: LAS_Z };
@@ -201,8 +210,7 @@ pipe("laser.riser", [[TURN.x, TURN.y - 7, LAS_Z], [TURN.x, Y0, LAS_Z], [TURN.x, 
 // ---------------------------------------------------------------- housings with their front panels off
 function housing(id, [x0, x1, y0, y1, z0, z1], { t = 4, bar = 10, sys, right = "full", left = "full", floor = true } = {}) {
   if (floor) box(`${id}.floor`, [x0, y0, z0], [x1, y1, z0 + t], { tone: "lo" }, { sys, r: 1 });
-  box(`${id}.back`, [x0, y0, z0 + t], [x1, y0 + t, z1 - t], { tone: "mid" }, { sys, r: 0.4, bias: -1,
-    inner: Ln([0.25, 0.5, 0.75].map((f) => path3([[x0 + (x1 - x0) * f, y0 + t, z0 + t], [x0 + (x1 - x0) * f, y0 + t, z1 - t]])).join(""), { tone: "faint" }) });
+  box(`${id}.back`, [x0, y0, z0 + t], [x1, y0 + t, z1 - t], { tone: "mid" }, { sys, r: 0.4, bias: -1 });
   if (left === "full") box(`${id}.left`, [x0, y0 + t, z0 + t], [x0 + t, y1, z1 - t], { tone: "mid" }, { sys, r: 0.4 });
   if (right === "full") box(`${id}.right`, [x1 - t, y0 + t, z0 + t], [x1, y1, z1 - t], { tone: "mid" }, { sys, r: 0.4 });
   else {
@@ -221,6 +229,7 @@ function housing(id, [x0, x1, y0, y1, z0, z1], { t = 4, bar = 10, sys, right = "
 // ---------------------------------------------------------------- 03 source vessel, collector, final focus
 SYS = "source";
 housing("vessel", VESSEL, { sys: "source" });
+ribs("vessel", VESSEL, [-200, -160, -236, -170], { pitch: 24 });
 const PLASMA = xz(PL);
 const CF = zF(PL[0], Y0, PL[1]); // s = z - plasma height
 const SAG = (r) => (r * r) / 72 - 18; // paraboloid with its focus on the plasma
@@ -283,6 +292,7 @@ for (const x of [-60, 88]) for (const y of [ILLUM[2] + 4, ILLUM[3] - 4]) {
 
 // mirrors: a disc on its normal, a cell ring round it and an arm back to the wall
 const unit2 = ([x, z]) => { const l = Math.hypot(x, z); return [x / l, z / l]; };
+
 const LIGHT = [{ id: "collector", at: [PL[0], PL[1] + SAG(0)], w: COLL_R }, { id: "if", at: IFP, w: 0.6 }, ...OPT];
 for (let i = 0; i < OPT.length; i++) {
   const o = OPT[i];
@@ -304,17 +314,32 @@ for (let i = 0; i < OPT.length; i++) {
     extra = Dots(pts, { size: 0.32, tone: "lo" });
   } else if (faceUp) extra = Ln(G.circleOf(F, 0.02, o.r * 0.72, P, 48), { tone: "faint" });
   const tone = "hi";
-  turned(`${o.sys}.${o.id}`, F, [[-o.t, o.r], [0, o.r]], { tone }, { sys: o.sys, extra, inner: Ln(G.arcOf(F, -o.t / 2, o.r, P), { tone: "faint" }) });
+  // the mirror stands 0.6 proud of its cell ring: one turned part, so it orders as one
+  const CELL = 1.4;
+  const cellDots = Dots(G.dotsOf(F, faceUp ? -0.6 : -o.t, o.r + CELL / 2, 12, P, { fade: [0.04, 0.42] }), { size: 0.3 });
+  turned(`${o.sys}.${o.id}`, F, [[-o.t, o.r + CELL], [-0.6, o.r + CELL], [-0.6, o.r], [0, o.r]], { tone }, { sys: o.sys, extra: extra + cellDots, inner: Ln(G.arcOf(F, -o.t / 2, o.r + CELL, P), { tone: "faint" }) });
   // arm along -y from the mirror's far rim to the housing back wall
   const back0 = (o.sys === "illum" ? ILLUM : PO)[2] + 4;
   const mid = G.add3(c, G.mul3(o.n, -o.t / 2));
-  const rimY = Y0 - o.r;
+  const rimY = Y0 - o.r - CELL;
+  ARM_X.push(mid[0]);
   box(`${o.sys}.${o.id}.arm`, [mid[0] - 1.8, back0, mid[2] - 1.8], [mid[0] + 1.8, rimY, mid[2] + 1.8], { tone: "lo" }, { sys: o.sys, extra: Dots([at([mid[0], back0 + 3, mid[2] + 1.8])], { size: 0.4 }) });
 }
+
+// stiffening ribs on the inside of the back walls, clear of the mirror arms
+function ribs(id, [x0, x1, y0, , z0, z1], keep = [], { t = 4, pitch = 30 } = {}) {
+  for (let x = x0 + pitch; x < x1 - 8; x += pitch) {
+    if ([...ARM_X, ...keep].some((ax) => Math.abs(ax - x) < 7)) continue;
+    box(`${id}.rib`, [x - 1.4, y0 + t, z0 + t], [x + 1.4, y0 + t + 2.4, z1 - t], { tone: "mid" }, { sys: SYS, r: 0.3 });
+  }
+}
+SYS = "illum";
+ribs("illum", ILLUM, [62, 76, 88]);
 
 // ---------------------------------------------------------------- 07 projection optics box and its metrology frame
 SYS = "po";
 housing("po", PO, { sys: "po", right: "open", floor: true });
+ribs("po", PO, [], { pitch: 18 });
 const PO_POST_Y = [-110, 34];
 for (const x of [100, 201]) {
   for (const y of PO_POST_Y) {
@@ -439,6 +464,25 @@ box("handler.reticle.library", [RL.x, RL.y, 294], [RL.x + RL.w, RL.y + RL.d, 318
 box("handler.reticle.pod", [RL.x + 6, RL.y + 8, 318], [RL.x + RL.w - 6, RL.y + RL.d - 8, 324], { tone: "hi" }, { sys: "handler", r: 1.5, steps: 3, bevel: 0.3 });
 box("handler.reticle.arm", [PO[1] - 14, -55, 304], [RL.x, -51, 307], { tone: "hi" }, { sys: "handler", r: 0.8 });
 
+// ---------------------------------------------------------------- 12 control racks at the back of the fab floor, and the RF generators that pump the amplifiers
+SYS = "control";
+for (const [i, x] of [338, 364, 390].entries()) {
+  const plan = { x, y: -122, w: 24, d: 36, r: 1 };
+  const yf = plan.y + plan.d + 0.05;
+  const slots = Array.from({ length: 6 }, (_, j) => path3([[x + 4, yf, 20 + j * 18], [x + 20, yf, 20 + j * 18], [x + 20, yf, 23 + j * 18], [x + 4, yf, 23 + j * 18]], true)).join("");
+  box("control.rack", [x, plan.y, 0], [x + 24, plan.y + plan.d, 128 - i * 14], { tone: "mid" }, { sys: "control", r: 1, steps: 2, bevel: 0.4,
+    inner: Ln(k.sideSeam(plan, 8, P, 2), { tone: "faint" }),
+    extra: Ln(slots, { tone: "faint" }) + `<g class="eu-led" data-led="${i}">${Dots([at([x + 6, yf, 12]), at([x + 10, yf, 12])], { size: 0.7, tone: "hi" })}</g>` });
+}
+box("control.tray", [-250, -124, 0], [338, -118, 3], { tone: "lo" }, { sys: "control", r: 0.6 });
+SYS = "laser";
+for (const a of AMP.slice(1)) {
+  const plan = { x: a.x0 + 14, y: -6, w: a.x1 - a.x0 - 28, d: 30, r: 1 };
+  box(`laser.${a.id}.rf`, [plan.x, plan.y, SUB_Z], [plan.x + plan.w, plan.y + plan.d, -36], { tone: "lo" }, { sys: "laser", r: 1, steps: 2,
+    inner: Ln(k.sideSeam(plan, -44, P, 2), { tone: "faint" }),
+    extra: Ln(Array.from({ length: 4 }, (_, j) => path3([[plan.x + 6 + j * 10, plan.y + plan.d + 0.05, -50], [plan.x + 9 + j * 10, plan.y + plan.d + 0.05, -50], [plan.x + 9 + j * 10, plan.y + plan.d + 0.05, -42], [plan.x + 6 + j * 10, plan.y + plan.d + 0.05, -42]], true)).join(""), { tone: "faint" }) });
+}
+
 // ---------------------------------------------------------------- inside details
 // droplet camera and its light curtain lamp on the vessel's far wall: they time each droplet for the pre-pulse
 SYS = "tin";
@@ -560,6 +604,10 @@ function chuckSvg(cx, id) {
   const clip = `<clipPath id="eu-wclip-${id}"><path d="${k.pathOf(Array.from({ length: 96 }, (_, i) => at([cx + (WAFER_R - 0.6) * Math.cos((i / 96) * 2 * Math.PI), Y0 + (WAFER_R - 0.6) * Math.sin((i / 96) * 2 * Math.PI), WZ])), true)}"/></clipPath>`;
   parts.push(clip, `<g clip-path="url(#eu-wclip-${id})" data-fields="${id}">${fields}</g>`);
   parts.push(Dots(k.corners(table, 2).map(([x, y]) => at([x, y, BASE_H + 25])), { size: 0.5 }));
+  // encoder heads read the grid plates above; drawn back to front
+  const heads = byDepth(k.corners(plan, 1.6)).map(([x, y]) => S(k.cylinder(x, y, 1.2, BASE_H + 10, 3, P, 16), { tone: "hi" }));
+  parts.splice(2, 0, ...heads.slice(0, 2));
+  parts.splice(4 + 2, 0, ...heads.slice(2));
   return parts.join("");
 }
 const stageSlot = indexOf((it) => it.name === "stages.base" || it.name === "po.back" || it.name === "po.left" || it.name === "po.floor");
@@ -600,6 +648,7 @@ const SYSTEMS = [
   ["metro", "Metrology", "height map and marks of the next wafer"],
   ["vac", "Vacuum and hydrogen", "pumps, and H2 that sweeps tin off the mirrors"],
   ["handler", "Handlers", "wafer robot, load lock, reticle library"],
+  ["control", "Control racks", "stage, source and dose control"],
 ];
 const list = `<ol class="eu-list" data-list>${SYSTEMS.map(([id, name, note], i) => `<li><button type="button" data-pick="${id}"><span class="eu-n">${String(i + 1).padStart(2, "0")}</span> ${name}<span class="eu-note">${note}</span></button></li>`).join("")}</ol>`;
 const body =

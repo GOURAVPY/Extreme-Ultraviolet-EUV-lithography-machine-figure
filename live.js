@@ -37,7 +37,7 @@ const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a
 const burst = (age, rise, fall) => (age <= 0 ? 0 : smooth(0, rise, age) * Math.exp(-Math.max(0, age - rise) / fall));
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 
-const SYSTEMS = ["laser", "tin", "source", "if", "illum", "reticle", "po", "stages", "metro", "vac", "handler"];
+const SYSTEMS = ["laser", "tin", "source", "if", "illum", "reticle", "po", "stages", "metro", "vac", "handler", "control"];
 const items = Object.fromEntries(SYSTEMS.map((id) => [id, [...stage.querySelectorAll(`.it[data-sys="${id}"]`)]]));
 const buttons = [...document.querySelectorAll("[data-pick]")];
 
@@ -98,7 +98,7 @@ function pick(id, { fromUser = false } = {}) {
 }
 const NAMES = {
   laser: "Drive laser", tin: "Tin droplets", source: "Source and collector", if: "Intermediate focus", illum: "Illuminator",
-  reticle: "Reticle stage", po: "Projection optics", stages: "Wafer stages", metro: "Metrology", vac: "Vacuum and hydrogen", handler: "Handlers",
+  reticle: "Reticle stage", po: "Projection optics", stages: "Wafer stages", metro: "Metrology", vac: "Vacuum and hydrogen", handler: "Handlers", control: "Control racks",
 };
 function hold() {
   touring = false;
@@ -158,6 +158,7 @@ function readoutFor(id, src, exp, meas, field, swapping) {
     case "stages": return `${scan} · wafer ${exp.dirSign > 0 ? "←" : "→"} ${fmt1(WAFER_SPEED, 2)} m/s`;
     case "metro": return `next wafer · height map ${Math.round(meas.frac * 100)}%`;
     case "vac": return "vacuum · a few Pa of H2 keeps tin off the optics";
+    case "control": return `dose loop · ${fmt1(PULSES_PER_FIELD)} pulses a field`;
     case "handler": return `${WPH} wafers an hour · one every ${fmt1(3600 / WPH, 1)} s`;
     default: return `${scan} · ${phase}`;
   }
