@@ -11,16 +11,16 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const THEME = process.argv.includes("--light") ? "light" : "dark";
 const strip = (file) => readFileSync(join(HERE, file), "utf8").replace(/^import .*$/gm, "").replace(/^export /gm, "");
 
-const W = 820;
-const H = 790;
+const W = 1200;
+const H = 1000;
 const AZIMUTH = 58;
 const ELEVATION = 28;
 
 // World: about 5 mm per unit at the wafer, z up, fab floor at z = 0, subfab floor at z = -130.
 // The light runs in the plane y = Y0; every housing has its front panel off (y = its front face).
 const Y0 = -35;
-const FAB = { x: -300, y: -125, w: 720, d: 170, r: 4 };
-const SUB = { x: -300, y: -125, w: 720, d: 245, r: 6 };
+const FAB = { x: -490, y: -125, w: 1140, d: 170, r: 4 };
+const SUB = { x: -490, y: -125, w: 1140, d: 245, r: 6 };
 const SUB_Z = -130;
 const LAS_Y = 82; // drive laser beam line in the subfab
 const LAS_Z = -98;
@@ -60,7 +60,9 @@ const MEAS_X = 270;
 const P = k.fitProjection(
   [...k.boxCorners(SUB, SUB_Z - 10, SUB_Z), ...k.boxCorners(FAB, -10, 0), [-262, -100, 146], [-235, -85, 324], [205, -85, 350], [205, 0, 350], [400, 30, 120], [400, -100, 120],
     // the apart pose: illuminator up 40, reticle stage up 55
-    [-235, -85, 368], [-235, 0, 368], [94, -85, 368], [30, -85, 402], [205, -85, 402], [30, 0, 402], [205, 0, 402]],
+    [-235, -85, 368], [-235, 0, 368], [94, -85, 368], [30, -85, 402], [205, -85, 402], [30, 0, 402], [205, 0, 402],
+    // the outside: service platform and railings, top tier, ports, duct and the right-hand module
+    [-484, -118, 292], [-484, 22, 292], [-262, -119, 488], [-70, -118, 488], [70, -118, 488], [-330, -76, 454], [470, -76, 454], [631, -119, 422], [631, 21, 422], [631, 21, 0]],
   W,
   H,
   { pad: 26, azimuth: AZIMUTH, elevation: ELEVATION },
@@ -159,7 +161,7 @@ back.push(S(k.slabOf(SUB, SUB_Z - 10, 10, P, 6, 1.2), { tone: "lo", inner: Ln(k.
 back.push(Ln(k.planOutline(k.insetPlan(SUB, 5), SUB_Z, P), { tone: "faint" }));
 record(A.slab(SUB, SUB_Z - 10, 10, { name: "stand.subfab", ground: true }, 6));
 SYS = "frame";
-for (const x of [-280, -160, -40, 80, 200, 320, 400]) {
+for (const x of [-460, -370, -280, -160, -40, 80, 200, 320, 400, 500, 620]) {
   disc("stand.pedestal", zF(x, 33, SUB_Z), 0, 3, 5, { tone: "lo" });
   disc("stand.pedestal", zF(x, 33, SUB_Z), 3, 120, 2.6, { tone: "mid" }, { inner: Ln(G.arcOf(zF(x, 33, SUB_Z), 60, 2.6, P), { tone: "faint" }) });
 }
@@ -167,11 +169,15 @@ box("stand.fab", [FAB.x, FAB.y, -10], [FAB.x + FAB.w, FAB.y + FAB.d, 0], { tone:
   inner: Ln(k.sideSeam(FAB, -4, P, 6), { tone: "faint" }),
   extra: Ln(
     [
-      ...Array.from({ length: 35 }, (_, i) => path3([[FAB.x + 20 + i * 20, FAB.y, 0], [FAB.x + 20 + i * 20, FAB.y + FAB.d, 0]])),
+      ...Array.from({ length: Math.floor(FAB.w / 20) - 1 }, (_, i) => path3([[FAB.x + 20 + i * 20, FAB.y, 0], [FAB.x + 20 + i * 20, FAB.y + FAB.d, 0]])),
       ...Array.from({ length: 7 }, (_, i) => path3([[FAB.x, FAB.y + 25 + i * 20, 0], [FAB.x + FAB.w, FAB.y + 25 + i * 20, 0]])),
     ].join(""),
     { tone: "faint" },
-  ),
+  ) +
+  // every other raised-floor tile is perforated, as in the fab: the clean air falls through them to the subfab
+  Dots(Array.from({ length: (Math.floor(FAB.w / 20) - 2) * 6 }, (_, n) => [FAB.x + 30 + (n % (Math.floor(FAB.w / 20) - 2)) * 20, FAB.y + 35 + Math.floor(n / (Math.floor(FAB.w / 20) - 2)) * 20])
+    .filter(([x, y]) => (Math.round((x - FAB.x - 30) / 20) + Math.round((y - FAB.y - 35) / 20)) % 2 === 0)
+    .flatMap(([x, y]) => [-5, 0, 5].flatMap((dx) => [-5, 0, 5].map((dy) => at([x + dx, y + dy, 0])))), { size: 0.45, tone: "faint" }),
 });
 
 // ---------------------------------------------------------------- 01 drive laser in the subfab
