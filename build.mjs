@@ -688,9 +688,14 @@ function cabinet(name, [x0, y0, z0], [x1, y1, z1], { doors = 1, sys = SYS, warn 
     hinges.push([hx, yf, zb + 9], [hx, yf, z1 - 9], [hx, yf, (zb + z1) / 2]);
   }
   lines.push(faceY(yf, x0 + 4, x0 + 13, z1 - 10, z1 - 6));
+  // a status window and three indicator lights by the label plate
+  const lx = x0 + 16;
+  if (x1 - x0 > 26) lines.push(faceY(yf, lx, lx + 8, z1 - 11, z1 - 5));
+  const leds = x1 - x0 > 26 ? [0, 1, 2].map((j) => [lx + 11 + j * 2.4, yf, z1 - 8]) : [];
   box(name, [x0, y0, zb], [x1, y1, z1], { tone: "mid" }, { sys, r: 0.8, steps: 2, bevel: 0.5,
     inner: Ln(k.sideSeam(plan, z1 - 3, P, 2), { tone: "faint" }),
-    extra: Ln(lines.join(""), { tone: "lo" }) + bolt(hinges, 0.55, "mid") + bolt(k.corners(plan, 1.6).map(([x, y]) => [x, y, z1]), 0.42) + bolt([[x0 + 4.8, yf, z1 - 8], [x0 + 12.2, yf, z1 - 8]], 0.3) });
+    extra: Ln(lines.join(""), { tone: "lo" }) + bolt(hinges, 0.55, "mid") + bolt(k.corners(plan, 1.6).map(([x, y]) => [x, y, z1]), 0.42) + bolt([[x0 + 4.8, yf, z1 - 8], [x0 + 12.2, yf, z1 - 8]], 0.3) +
+      (leds.length ? `<g class="eu-led" data-led="${name}">${bolt(leds, 0.62, "hi")}</g>` : "") });
   for (let i = 0; i < doors; i++) {
     const hx = i % 2 ? x0 + i * w + 4.5 : x0 + (i + 1) * w - 4.5;
     const zc = (zb + z1) / 2;
@@ -833,8 +838,8 @@ for (const y of [18, -116]) {
 }
 [-30, -55, -80].forEach((y, j) => {
   box("cool.bay.bar", [432, y - 2, 410], [524, y + 2, 414], { tone: "mid" }, { r: 0.4 });
-  [[438, 458], [466, 490], [496, 520]].forEach(([xa, xb], n) => {
-    const zl = 300 + ((j * 3 + n * 7) % 5) * 9;
+  [[436, 452], [458, 476], [482, 500], [506, 522]].forEach(([xa, xb], n) => {
+    const zl = 296 + ((j * 3 + n * 7) % 5) * 10;
     pipe(`cool.loop.${j}.${n}`, [[xa, y, 410], [xa, y, zl], [xb, y, zl], [xb, y, 410]], 1.6, { bend: (xb - xa) / 2 - 0.3, limp: true, maxLength: 24, bundle: "bay", className: "eu-tint eu-black" });
   });
 });
@@ -843,7 +848,7 @@ for (const y of [18, -116]) {
 SYS = "deck";
 for (const x of [-258, -110, 40, 225]) column("deck.top.post", x, -114, 0, 414, { plate: true });
 deck("deck.top", -262, 425.5, -119, -40, 414, { grate: false });
-deck("deck.right.top", 425.5, 631, -119, 21, 414, { grate: false });
+deck("deck.right.top", 425.5, 631, -119, 21, 414);
 pipe("deck.duct", [[-330, -70, 285], [-330, -70, 446], [470, -70, 446], [470, -70, 420]], 6, { tone: "hi", bend: 16, maxLength: 40 });
 for (const x of [-200, -40, 120, 300]) box("deck.duct.stand", [x - 3, -74, 420], [x + 3, -66, 440], { tone: "lo" }, { r: 0.3, extra: bolt([[x - 1.8, -66, 421.2], [x + 1.8, -66, 421.2]], 0.3) });
 box("deck.bulkhead", [-70, -118, 420], [70, -114, 488], { tone: "mid" }, { r: 0.4,
@@ -860,6 +865,36 @@ for (let x = -230; x <= 390; x += 24) box("power.tray.rung", [x - 1, -110, 420],
 for (const x0 of [-258, 404]) box("power.tray.box", [x0, -114, 420], [x0 + 14, -90, 434], { tone: "mid" }, { r: 0.8, steps: 2, bevel: 0.4,
   extra: Ln(faceY(-89.95, x0 + 2, x0 + 12, 422, 432), { tone: "lo" }) + bolt([[x0 + 3, -89.95, 423], [x0 + 11, -89.95, 423], [x0 + 3, -89.95, 431], [x0 + 11, -89.95, 431]], 0.32) });
 for (let i = 0; i < 5; i++) pipe(`power.tray.cable.${i}`, [[-244, -108 + i * 3.2, 422.4], [404, -108 + i * 3.2, 422.4]], 0.9, { maxLength: 80, limp: true, bundle: "tray", className: i % 2 ? "eu-tint eu-water" : "eu-tint eu-black" });
+
+// ------------- 16 the small lines: conduits into the decks, cable drops, a connector panel, hoses over the top
+// conduits from every cabinet roof up into the deck above it
+for (const [x0, x1, y, top, roof] of [[-472, -450, -23, 128, 140], [-448, -426, -23, 128, 140], [-334, -288, -5, 120, 140], [500, 570, -13, 120, 150], [532, 624, -23, 410, 414]]) {
+  const n = Math.max(2, Math.floor((x1 - x0 - 6) / 6));
+  for (let i = 0; i < n; i++) pipe(`power.conduit.${x0}.${i}`, [[x0 + 4 + ((x1 - x0 - 8) * i) / (n - 1), y, top], [x0 + 4 + ((x1 - x0 - 8) * i) / (n - 1), y, roof]], 0.8, { tone: "hi", className: i % 3 === 1 ? "eu-tint eu-black" : undefined });
+}
+// cable drops: from the tray's left junction box down beside the frame to the floor, and up the top-tier posts
+for (let i = 0; i < 3; i++) {
+  const y = -104 + i * 4;
+  disc("power.drop.grommet", zF(-269, y, 0), 0, 0.8, 1.9, { tone: "lo" });
+  pipe(`power.drop.${i}`, [[-258, y, 426 - i * 2.4], [-269, y, 426 - i * 2.4], [-269, y, 0.8]], 0.8, { bend: 5 - i * 1.4, limp: true, bundle: "drop", maxLength: 40, className: i === 1 ? "eu-tint eu-water" : "eu-tint eu-black" });
+}
+for (const x of [40, 225]) for (let i = 0; i < 3; i++) {
+  const cx = x - 2.6 + i * 2.6;
+  disc("power.riser.grommet", zF(cx, -104, 0), 0, 0.8, 1.2, { tone: "lo" });
+  pipe(`power.riser.${x}.${i}`, [[cx, -104, 0.8], [cx, -104, 414]], 0.6, { limp: true, bundle: `riser${x}`, maxLength: 60, className: "eu-tint eu-black" });
+}
+// connector panel on the platform: three rows of round plugs, the harness head of the left module
+{
+  const PX = [-466, -404];
+  const conns = [];
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 11; c++) conns.push([PX[0] + 5 + c * 5.2, -103.95, 260 + r * 8]);
+  const rings = conns.map(([x, y, z]) => G.circleOf(yF(x, y, z), 0, 1.6, P, 18)).join("");
+  box("power.patch", [PX[0], -108, 250], [PX[1], -104, 288], { tone: "mid" }, { sys: "power", r: 0.6, steps: 2, bevel: 0.3,
+    extra: Ln(rings, { tone: "lo" }) + bolt(conns, 0.5, "hi") + bolt([[PX[0] + 1.6, -103.95, 286.4], [PX[1] - 1.6, -103.95, 286.4], [PX[0] + 1.6, -103.95, 251.6], [PX[1] - 1.6, -103.95, 251.6]], 0.36) });
+}
+// two water hoses over the top tier, from the port bulkhead's side across to the right module's roof
+for (const [i, [z, xd]] of [[470, 438], [478, 446]].entries())
+  pipe(`cool.top.hose.${i}`, [[70, -116, z], [xd, -116, z], [xd, -116, 420]], 1.5, { bend: 10, maxLength: 60, className: "eu-tint eu-water" });
 
 // ---------------------------------------------------------------- settle and assemble
 A.settle(R, P);
@@ -981,7 +1016,7 @@ const body =
 
 const kitSource = strip("kit/iso-kit.mjs");
 const modelSource = strip("model.mjs");
-const page = k.pageHtml({ title: "EUV scanner", theme: THEME, body, script: kitSource + modelSource + LIVE, width: 900 });
+const page = k.pageHtml({ title: "EUV scanner", theme: THEME, body, script: kitSource + modelSource + LIVE, width: 1240 });
 const name = THEME === "light" ? "euv-lithography-light.html" : "euv-lithography.html";
 writeFileSync(join(HERE, name), page);
 console.log("wrote", name, `${(page.length / 1024).toFixed(0)} KB`, `${R.items.length} items`, `scale ${KS.toFixed(3)}`, `${PIPES.length} pipes`);
