@@ -62,7 +62,7 @@ const P = k.fitProjection(
     // the apart pose: illuminator up 40, reticle stage up 55
     [-235, -85, 368], [-235, 0, 368], [94, -85, 368], [30, -85, 402], [205, -85, 402], [30, 0, 402], [205, 0, 402],
     // the outside: service platform and railings, top tier, ports, duct and the right-hand module
-    [-484, -118, 292], [-484, 22, 292], [-262, -119, 488], [-70, -118, 488], [70, -118, 488], [-330, -51, 448], [500, -51, 448], [650, 10, 160], [631, -119, 422], [631, 21, 422], [631, 21, 0]],
+    [-484, -118, 292], [-484, 22, 292], [-262, -119, 488], [-70, -118, 488], [70, -118, 488], [-330, -51, 448], [500, -51, 448], [650, 10, 160], [-110, -64, 486], [380, -64, 486], [631, -119, 422], [631, 21, 422], [631, 21, 0]],
   W,
   H,
   { pad: 26, azimuth: AZIMUTH, elevation: ELEVATION },
@@ -931,6 +931,29 @@ for (const x of [40, 225]) for (let i = 0; i < 3; i++) {
 // two water hoses over the top tier, from the port bulkhead's side across to the right module's roof
 for (const [i, [z, xd]] of [[470, 470], [478, 480]].entries())
   pipe(`cool.top.hose.${i}`, [[70, -116, z], [xd, -116, z], [xd, -116, 420]], 1.5, { bend: 10, maxLength: 60, className: "eu-tint eu-water" });
+
+// ------------- 17 more of the photo: the platform's upper cage, a second stainless pipe on its rack, the harness rack,
+// cable trunking over the valve panel, and stop-button boxes on the posts
+SYS = "deck";
+// a tall cage of rails inside the platform's railing, as on the left of the photo
+railing("deck.left.cage", -470, -307, -110, 12, 250, { h: 86, gaps: [[-32, -8]] });
+// the second stainless pipe rides high on a two-post rack, so on screen it passes above the duct and the ports
+pipe("deck.pipe2", [[-110, -60, 420], [-110, -60, 480], [380, -60, 480], [380, -60, 420]], 4, { tone: "hi", bend: 10, maxLength: 40 });
+for (const x of [40, 220]) box("deck.pipe2.stand", [x - 2.5, -63, 420], [x + 2.5, -57, 476], { tone: "mid" }, { owner: "deck.pipe2", r: 0.3, extra: bolt([[x - 1.4, -57, 421.4], [x + 1.4, -57, 421.4]], 0.3) });
+SYS = "power";
+// the harness rack: two bolted end plates and four rows of cable between them
+for (const x0 of [-240, -164]) box("power.harness.plate", [x0, -86, 420], [x0 + 2, -80, 450], { tone: "mid" }, { r: 0.3, extra: bolt([[x0 + (SX > 0 ? 2 : 0), -83, 447.5], [x0 + (SX > 0 ? 2 : 0), -83, 422.5]], 0.3) });
+for (const [i, z] of [428, 434, 440, 446].entries()) pipe(`power.harness.cable.${i}`, [[-238, -83, z], [-164, -83, z]], 1, { limp: true, bundle: "harness", maxLength: 40, className: i % 2 ? "eu-tint eu-water" : "eu-tint eu-black" });
+// white trunking over the valve panel on two brackets, with cables up into the deck above
+box("power.trunking", [440, -30, 244], [616, -24, 252], { tone: "hi" }, { r: 0.6, steps: 2, bevel: 0.3,
+  extra: Ln([440, 484, 528, 572].map((x) => faceY(-23.95, x + 1.5, x + 42.5, 245.5, 250.5)).join(""), { tone: "faint" }) + bolt([462, 506, 550, 594].map((x) => [x, -23.95, 251]), 0.3) });
+for (const x of [446, 610]) box("power.trunking.bracket", [x - 1.5, -36, 246], [x + 1.5, -30, 250], { tone: "lo" }, { r: 0.2 });
+for (const [i, x] of [460, 488, 516, 544, 572, 600].entries()) pipe(`power.trunking.cable.${i}`, [[x, -27, 252], [x, -27, 262]], 0.7, { limp: true, className: i % 2 ? "eu-tint eu-black" : undefined });
+// stop-button boxes on the frame posts: a yellow box and a red mushroom head
+for (const [x, z] of [[-387, 96], [528, 100], [428, 330]]) {
+  box("power.post.stop", [x - 3, 20.5, z - 4], [x + 3, 24, z + 4], tint("warn"), { r: 0.4, extra: bolt([[x - 2, 24, z + 3], [x + 2, 24, z - 3]], 0.26) });
+  turned("power.post.stop.head", yF(x, 24, z), [[0, 1.2], [1, 1.2], [1.2, 2.4, 1], [2, 2.6, 1], [2.6, 2, 1], [2.9, 0.5]], tint("stop"));
+}
 
 // ---------------------------------------------------------------- settle and assemble
 A.settle(R, P);
