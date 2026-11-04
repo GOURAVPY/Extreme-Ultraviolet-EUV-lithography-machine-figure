@@ -776,7 +776,7 @@ cabinet("power.left.cab", [-472, -60, 0], [-450, 14, 128]);
 cabinet("power.left.cab", [-448, -60, 0], [-426, 14, 128]);
 cabinet("power.left.ecab", [-348, -24, 0], [-306, 14, 120], { warn: true });
 for (let i = 0; i < 5; i++) {
-  const x = -340 + i * 6;
+  const x = -334 + i * 6;
   disc("power.left.gland", yF(x, 14, 10), 0, 1.6, 1.3, { tone: "hi" });
   disc("power.left.grommet", zF(x, 24, 0), 0, 0.8, 1.9, { tone: "lo" });
   pipe(`power.left.cable.${i}`, [[x, 15.6, 10], [x, 24, 10], [x, 24, 0.8]], 0.7, { flanges: [false, false], bend: 3, limp: true, className: "eu-tint eu-black" });
@@ -803,7 +803,7 @@ for (const x of [428, 528, 628]) for (const y of [-116, 18]) {
 deck("deck.right.low", 425, 631, -119, 21, 150);
 deck("deck.right.mid", 425, 631, -119, 21, 262);
 SYS = "power";
-cabinet("power.right.cab", [500, -40, 0], [566, 14, 120], { doors: 2, warn: true });
+cabinet("power.right.cab", [500, -40, 0], [560, 14, 120], { doors: 2, warn: true });
 cabinet("power.right.tall", [532, -60, 268], [624, 14, 410], { doors: 2, stop: true, louvres: 6 });
 column("power.sensor.stand", 479, 4, 0, 40, { s: 1.6, plate: true });
 box("power.sensor", [470, -2, 40], [488, 10, 58], { tone: "hi" }, { r: 1, steps: 2, bevel: 0.4,
@@ -812,17 +812,20 @@ turned("power.sensor.plug", yF(479, 10, 49), [[0, 2.4], [2.4, 2.4], [2.4, 1.7], 
 disc("power.sensor.grommet", zF(479, 24, 0), 0, 0.8, 2, { tone: "lo" });
 pipe("power.sensor.cable", [[479, 15, 49], [479, 24, 49], [479, 24, 0.8]], 0.9, { flanges: [false, false], bend: 4, limp: true, className: "eu-tint eu-black" });
 SYS = "cool";
-// two risers from the floor, each cut by four valve bodies: the pipe runs from body to body, so nothing wraps anything
+// two risers from the floor, each cut by four valve bodies: the pipe runs from body to body, so nothing wraps anything.
+// They stand where no frame post lines up with them on screen.
 const VZ = [40, 70, 100, 130];
-for (const [j, x] of [598, 610].entries()) {
-  disc("cool.right.port", zF(x, 6, 0), 0, 1, 4.2, { tone: "lo" });
-  [1, ...VZ.map((z) => z + 3.6)].forEach((z0, i) => pipe(`cool.right.header.${j}.${i}`, [[x, 6, z0], [x, 6, i < VZ.length ? VZ[i] - 3.6 : 150]], 2.4, { tone: "hi", flanges: [false, false], maxLength: 30 }));
+// The second one stands outside the frame, as in the photo, and turns into the side of the lower deck.
+for (const [j, [x, y]] of [[590, 6], [640, 6]].entries()) {
+  disc("cool.right.port", zF(x, y, 0), 0, 1, 4.2, { tone: "lo" });
+  const last = j ? [[x, y, 153], [631, y, 153]] : [[x, y, 150]];
+  [1, ...VZ.map((z) => z + 3.6)].forEach((z0, i) => pipe(`cool.right.header.${j}.${i}`, [[x, y, z0], ...(i < VZ.length ? [[x, y, VZ[i] - 3.6]] : last)], 2.4, { tone: "hi", flanges: [false, false], maxLength: 30, bend: 6 }));
   VZ.forEach((z, i) => {
-    box("cool.right.valve", [x - 3.6, 2.4, z - 3.6], [x + 3.6, 9.6, z + 3.6], { tone: "mid" }, { r: 0.6, extra: bolt([[x - 2.4, 9.6, z + 2.4], [x + 2.4, 9.6, z - 2.4]], 0.3) });
-    box("cool.right.lever", [x - 0.6, 9.6, z + 1.2], [x + 0.6, 16, z + 2.6], tint("water"), { owner: "cool.right.valve", r: 0.3 });
+    box("cool.right.valve", [x - 3.6, y - 3.6, z - 3.6], [x + 3.6, y + 3.6, z + 3.6], { tone: "mid" }, { r: 0.6, extra: bolt([[x - 2.4, y + 3.6, z + 2.4], [x + 2.4, y + 3.6, z - 2.4]], 0.3) });
+    box("cool.right.lever", [x - 0.6, y + 3.6, z + 1.2], [x + 0.6, y + 10, z + 2.6], tint("water"), { owner: "cool.right.valve", r: 0.3 });
     if (j === 0) {
-      const lane = 572 + i * 5.5;
-      pipe(`cool.right.hose.${i}`, [[x - 3.6, 6, z], [lane, 6, z], [lane, 6, 150]], 1.4, { bend: 4, className: "eu-tint eu-water" });
+      const lane = 563 + i * 5.5;
+      pipe(`cool.right.hose.${i}`, [[x - 3.6, y, z], [lane, y, z], [lane, y, 150]], 1.4, { bend: 4, className: "eu-tint eu-water" });
     }
   });
 }
@@ -875,7 +878,7 @@ for (let i = 0; i < 4; i++) pipe(`power.tray.cable.${i}`, [[-244, -106.8 + i * 3
 
 // ------------- 16 the small lines: conduits into the decks, cable drops, a connector panel, hoses over the top
 // conduits from every cabinet roof up into the deck above it
-for (const [x0, x1, y, top, roof] of [[-472, -450, -23, 128, 140], [-448, -426, -23, 128, 140], [-348, -306, -5, 120, 140], [500, 566, -13, 120, 150], [532, 624, -23, 410, 414]]) {
+for (const [x0, x1, y, top, roof] of [[-472, -450, -23, 128, 140], [-448, -426, -23, 128, 140], [-348, -306, -5, 120, 140], [514, 560, -13, 120, 150], [532, 624, -23, 410, 414]]) {
   const n = Math.max(2, Math.floor((x1 - x0 - 6) / 6));
   for (let i = 0; i < n; i++) pipe(`power.conduit.${x0}.${i}`, [[x0 + 4 + ((x1 - x0 - 8) * i) / (n - 1), y, top], [x0 + 4 + ((x1 - x0 - 8) * i) / (n - 1), y, roof]], 0.8, { tone: "hi", className: i % 3 === 1 ? "eu-tint eu-black" : undefined });
 }
@@ -883,7 +886,7 @@ for (const [x0, x1, y, top, roof] of [[-472, -450, -23, 128, 140], [-448, -426, 
 for (let i = 0; i < 3; i++) {
   const y = -112 + i * 3; // behind the source chamber, also when it slides out
   disc("power.drop.grommet", zF(-269, y, 0), 0, 0.8, 1.9, { tone: "lo" });
-  pipe(`power.drop.${i}`, [[-258, y, 426 - i * 2.4], [-269, y, 426 - i * 2.4], [-269, y, 0.8]], 0.8, { bend: 5 - i * 1.4, limp: true, bundle: "drop", maxLength: 40, className: i === 1 ? "eu-tint eu-water" : "eu-tint eu-black" });
+  pipe(`power.drop.${i}`, [[-258, y, 431 - i * 2.6], [-269, y, 431 - i * 2.6], [-269, y, 0.8]], 0.8, { bend: 5 - i * 1.4, limp: true, bundle: "drop", maxLength: 40, className: i === 1 ? "eu-tint eu-water" : "eu-tint eu-black" });
 }
 for (const x of [40, 225]) for (let i = 0; i < 3; i++) {
   const cx = x - 2.6 + i * 2.6;
