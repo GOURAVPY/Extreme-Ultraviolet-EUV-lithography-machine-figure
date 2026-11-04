@@ -907,7 +907,7 @@ for (const x of [40, 225]) for (let i = 0; i < 3; i++) {
     extra: Ln(rings, { tone: "lo" }) + bolt(conns, 0.5, "hi") + bolt([[PX[0] + 1.6, -103.95, 286.4], [PX[1] - 1.6, -103.95, 286.4], [PX[0] + 1.6, -103.95, 251.6], [PX[1] - 1.6, -103.95, 251.6]], 0.36) });
 }
 // two water hoses over the top tier, from the port bulkhead's side across to the right module's roof
-for (const [i, [z, xd]] of [[470, 438], [478, 446]].entries())
+for (const [i, [z, xd]] of [[470, 470], [478, 480]].entries())
   pipe(`cool.top.hose.${i}`, [[70, -116, z], [xd, -116, z], [xd, -116, 420]], 1.5, { bend: 10, maxLength: 60, className: "eu-tint eu-water" });
 
 // ---------------------------------------------------------------- settle and assemble
