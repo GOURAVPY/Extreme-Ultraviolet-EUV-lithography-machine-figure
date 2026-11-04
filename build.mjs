@@ -789,7 +789,9 @@ box("deck.exhaust", [-345, -60, 250], [-315, -30, 285], { tone: "mid" }, { r: 1,
 SYS = "power";
 cabinet("power.left.cab", [-472, -60, 0], [-450, 14, 128]);
 cabinet("power.left.cab", [-448, -60, 0], [-426, 14, 128]);
-cabinet("power.left.ecab", [-348, -24, 0], [-306, 14, 120], { warn: true });
+cabinet("power.left.ecab", [-348, -24, 0], [-306, 14, 120], { warn: true, ports: 6 });
+// cables from the narrow cabinets into the floor, placed where no frame post lines up with them on screen
+glands("power.left.cab", [-462, -455, -442, -434], 14, 10, 0, 24);
 for (let i = 0; i < 5; i++) {
   const x = -334 + i * 6;
   disc("power.left.gland", yF(x, 14, 10), 0, 1.6, 1.3, { tone: "hi" });
@@ -818,8 +820,10 @@ for (const x of [428, 528, 628]) for (const y of [-116, 18]) {
 deck("deck.right.low", 425, 631, -119, 21, 150);
 deck("deck.right.mid", 425, 631, -119, 21, 262);
 SYS = "power";
-cabinet("power.right.cab", [500, -40, 0], [560, 14, 120], { doors: 2, warn: true });
-cabinet("power.right.tall", [532, -60, 268], [624, 14, 410], { doors: 2, stop: true, louvres: 6 });
+cabinet("power.right.cab", [500, -40, 0], [560, 14, 120], { doors: 2, warn: true, ports: 5 });
+cabinet("power.right.tall", [532, -60, 268], [624, 14, 410], { doors: 2, stop: true, louvres: 6, ports: 8 });
+glands("power.right.cab", [505, 511, 517, 543, 549, 555], 14, 10, 0, 24);
+glands("power.right.tall", [548, 556, 592, 600], 14, 278, 268, 19.5);
 column("power.sensor.stand", 479, 4, 0, 40, { s: 1.6, plate: true });
 box("power.sensor", [470, -2, 40], [488, 10, 58], { tone: "hi" }, { r: 1, steps: 2, bevel: 0.4,
   inner: Ln(k.sideSeam({ x: 470, y: -2, w: 18, d: 12, r: 1 }, 54, P, 2), { tone: "faint" }), extra: bolt([[471.6, 10, 56.4], [486.4, 10, 56.4], [471.6, 10, 41.6], [486.4, 10, 41.6]], 0.36) });
@@ -854,6 +858,11 @@ for (let i = 0; i < 7; i++) {
     box("cool.panel.lever", [c + 3.5, -32, z + 1], [c + 10, -30.8, z + 2.4], tint("water"), { owner: "cool.panel.valve", r: 0.3 });
   }
   pipe(`cool.panel.hose.${i}`, [[c, -30, 176], [c, -22, 176], [c, -22, 156]], 1.3, { bend: 4, className: "eu-tint eu-water" });
+}
+// two stainless headers across the panel between the valve rows, on bolted brackets at each end
+for (const z of [222, 192]) {
+  for (const x0 of [436, 614]) box("cool.panel.bracket", [x0, -36, z - 4], [x0 + 6, -28, z + 4], { tone: "mid" }, { r: 0.4, extra: bolt([[x0 + 1.5, -28, z + 2.5], [x0 + 4.5, -28, z - 2.5]], 0.3) });
+  pipe(`cool.panel.header.${z}`, [[442, -32, z], [614, -32, z]], 1.6, { tone: "hi", maxLength: 40 });
 }
 // the hose bay: X braces front and back, and three rows of hose loops hanging from bars under the top deck
 for (const y of [18, -116]) {
