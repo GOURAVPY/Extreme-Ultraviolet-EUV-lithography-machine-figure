@@ -62,7 +62,7 @@ const P = k.fitProjection(
     // the apart pose: illuminator up 40, reticle stage up 55
     [-235, -85, 368], [-235, 0, 368], [94, -85, 368], [30, -85, 402], [205, -85, 402], [30, 0, 402], [205, 0, 402],
     // the outside: service platform and railings, top tier, ports, duct and the right-hand module
-    [-484, -118, 292], [-484, 22, 292], [-262, -119, 488], [-70, -118, 488], [70, -118, 488], [-330, -76, 454], [470, -76, 454], [631, -119, 422], [631, 21, 422], [631, 21, 0]],
+    [-484, -118, 292], [-484, 22, 292], [-262, -119, 488], [-70, -118, 488], [70, -118, 488], [-330, -76, 460], [500, -76, 460], [631, -119, 422], [631, 21, 422], [631, 21, 0]],
   W,
   H,
   { pad: 26, azimuth: AZIMUTH, elevation: ELEVATION },
@@ -127,7 +127,8 @@ const xF = (x, y, z) => G.frameOf([x, y, z], [1, 0, 0], [0, 1, 0], [0, 0, 1]);
 const PIPES = [];
 const ARM_X = [];
 // Looked at 8x: the floor slab counts as a rod, but these lines end on blocks standing well inside it.
-const CROWD_OK = [["vac.h2.line", "stand.fab"]];
+// The manifold risers stand on valves on the manifold block, so their feet sit on its outline and the floor's by design.
+const CROWD_OK = [["vac.h2.line", "stand.fab"], ["cool.left.riser*", "stand.fab"], ["cool.left.riser*", "cool.left.manifold"]];
 function pipe(name, points, r, { tone = "mid", bend = 0, flanges = [true, true], maxLength = 18, rings, limp = false, bias = 0.02, sys, free = [false, false], bundle, className } = {}) {
   const route = G.fillet(points, Math.max(bend || r * 2.6, 3), 10, { P, tube: r });
   const total = G.pathLength(route);
@@ -874,13 +875,13 @@ for (let i = 0; i < 4; i++) pipe(`power.tray.cable.${i}`, [[-244, -106.8 + i * 3
 
 // ------------- 16 the small lines: conduits into the decks, cable drops, a connector panel, hoses over the top
 // conduits from every cabinet roof up into the deck above it
-for (const [x0, x1, y, top, roof] of [[-472, -450, -23, 128, 140], [-448, -426, -23, 128, 140], [-334, -288, -5, 120, 140], [500, 570, -13, 120, 150], [532, 624, -23, 410, 414]]) {
+for (const [x0, x1, y, top, roof] of [[-472, -450, -23, 128, 140], [-448, -426, -23, 128, 140], [-348, -306, -5, 120, 140], [500, 566, -13, 120, 150], [532, 624, -23, 410, 414]]) {
   const n = Math.max(2, Math.floor((x1 - x0 - 6) / 6));
   for (let i = 0; i < n; i++) pipe(`power.conduit.${x0}.${i}`, [[x0 + 4 + ((x1 - x0 - 8) * i) / (n - 1), y, top], [x0 + 4 + ((x1 - x0 - 8) * i) / (n - 1), y, roof]], 0.8, { tone: "hi", className: i % 3 === 1 ? "eu-tint eu-black" : undefined });
 }
 // cable drops: from the tray's left junction box down beside the frame to the floor, and up the top-tier posts
 for (let i = 0; i < 3; i++) {
-  const y = -104 + i * 4;
+  const y = -112 + i * 3; // behind the source chamber, also when it slides out
   disc("power.drop.grommet", zF(-269, y, 0), 0, 0.8, 1.9, { tone: "lo" });
   pipe(`power.drop.${i}`, [[-258, y, 426 - i * 2.4], [-269, y, 426 - i * 2.4], [-269, y, 0.8]], 0.8, { bend: 5 - i * 1.4, limp: true, bundle: "drop", maxLength: 40, className: i === 1 ? "eu-tint eu-water" : "eu-tint eu-black" });
 }
