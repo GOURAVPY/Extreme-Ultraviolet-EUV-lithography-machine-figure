@@ -675,10 +675,18 @@ function railing(name, x0, x1, y0, y1, z, { h = 38, sys = SYS, gaps = [] } = {})
   }
 }
 // a sheet-steel cabinet on a plinth: doors, louvres, hinges and handles on the front face y = y1
-function cabinet(name, [x0, y0, z0], [x1, y1, z1], { doors = 1, sys = SYS, warn = false, stop = false, louvres = 4 } = {}) {
+// cable glands on a cabinet's front face, each with its cable running out and down to a grommet on the floor below
+function glands(name, xs, yf, z, floor, yOut, { sys = SYS } = {}) {
+  xs.forEach((x, i) => {
+    disc(`${name}.gland`, yF(x, yf, z), 0, 1.6, 1.3, { tone: "hi" }, { sys });
+    disc(`${name}.grommet`, zF(x, yOut, floor), 0, 0.8, 1.6, { tone: "lo" }, { sys });
+    pipe(`${name}.cable.${i}`, [[x, yf + 1.6, z], [x, yOut, z], [x, yOut, floor + 0.8]], 0.7, { flanges: [false, false], bend: Math.min(3, yOut - yf - 2), limp: true, sys, className: i % 3 === 2 ? "eu-tint eu-water" : "eu-tint eu-black" });
+  });
+}
+function cabinet(name, [x0, y0, z0], [x1, y1, z1], { doors = 1, sys = SYS, warn = false, stop = false, louvres = 4, ports = 0 } = {}) {
   const plan = { x: x0, y: y0, w: x1 - x0, d: y1 - y0, r: 0.8 };
-  box(`${name}.plinth`, [x0 + 1.5, y0 + 1.5, z0], [x1 - 1.5, y1 - 1.5, z0 + 3], { tone: "lo" }, { sys, r: 0.4 });
   const zb = z0 + 3;
+  box(`${name}.plinth`, [x0 + 1.5, y0 + 1.5, z0], [x1 - 1.5, y1 - 1.5, zb], { tone: "lo" }, { sys, r: 0.4 });
   const yf = y1 + 0.05;
   const w = (x1 - x0) / doors;
   const lines = [];
@@ -696,6 +704,10 @@ function cabinet(name, [x0, y0, z0], [x1, y1, z1], { doors = 1, sys = SYS, warn 
   const lx = x0 + 16;
   if (x1 - x0 > 26) lines.push(faceY(yf, lx, lx + 8, z1 - 11, z1 - 5));
   const leds = x1 - x0 > 26 ? [0, 1, 2].map((j) => [lx + 11 + j * 2.4, yf, z1 - 8]) : [];
+  // a row of round connector sockets on the first door, each a ring with its pin
+  const sockets = Array.from({ length: ports }, (_, j) => [x0 + 6 + j * 4.4, yf, zb + 24]);
+  sockets.forEach(([x, y, z]) => lines.push(G.circleOf(yF(x, y, z), 0, 1.5, P, 18)));
+  hinges.push(...sockets);
   box(name, [x0, y0, zb], [x1, y1, z1], { tone: "mid" }, { sys, r: 0.8, steps: 2, bevel: 0.5,
     inner: Ln(k.sideSeam(plan, z1 - 3, P, 2), { tone: "faint" }),
     extra: Ln(lines.join(""), { tone: "lo" }) + bolt(hinges, 0.55, "mid") + bolt(k.corners(plan, 1.6).map(([x, y]) => [x, y, z1]), 0.42) + bolt([[x0 + 4.8, yf, z1 - 8], [x0 + 12.2, yf, z1 - 8]], 0.3) +
@@ -848,11 +860,12 @@ for (const y of [18, -116]) {
   brace("cool.bay.brace", [430.5, y + 1.6, 270], [525.5, y, 412], 0.9);
   brace("cool.bay.brace", [430.5, y - 1.6, 412], [525.5, y, 270], 0.9);
 }
-[-30, -55, -80].forEach((y, j) => {
+[-30, -55, -80, -104].forEach((y, j) => {
   box("cool.bay.bar", [432, y - 2, 410], [524, y + 2, 414], { tone: "mid" }, { r: 0.4 });
   [[436, 452], [458, 476], [482, 500], [506, 522]].forEach(([xa, xb], n) => {
     const zl = 296 + ((j * 3 + n * 7) % 5) * 10;
-    pipe(`cool.loop.${j}.${n}`, [[xa, y, 410], [xa, y, zl], [xb, y, zl], [xb, y, 410]], 1.6, { bend: (xb - xa) / 2 - 0.3, limp: true, maxLength: 24, bundle: "bay", className: "eu-tint eu-black" });
+    // mostly black service hoses, with a blue water line in among them, as in the photo
+    pipe(`cool.loop.${j}.${n}`, [[xa, y, 410], [xa, y, zl], [xb, y, zl], [xb, y, 410]], 1.6, { bend: (xb - xa) / 2 - 0.3, limp: true, maxLength: 24, bundle: "bay", className: (j + n) % 3 === 0 ? "eu-tint eu-water" : "eu-tint eu-black" });
   });
 });
 
