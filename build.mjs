@@ -131,7 +131,9 @@ const ARM_X = [];
 // The tray cables lie between the tray's rails, and the hose loops hang behind the bay's X braces and posts: looked at 4x.
 // The first water riser segment ends on its valve just above the floor's front edge.
 const CROWD_OK = [["vac.h2.line", "stand.fab"], ["cool.left.riser*", "stand.fab"], ["cool.left.riser*", "cool.left.manifold"],
-  ["power.tray.cable*", "power.tray.rail"], ["cool.loop*", "cool.bay.brace"], ["cool.loop*", "deck.right.post"], ["cool.right.header*", "stand.fab"]];
+  ["power.tray.cable*", "power.tray.rail"], ["cool.loop*", "cool.bay.brace"], ["cool.loop*", "deck.right.post"], ["cool.right.header*", "stand.fab"],
+  // the duct rises from its fan box inside the platform's cage, so a cage post stands in front of its foot
+  ["deck.duct", "deck.left.cage.post"]];
 function pipe(name, points, r, { tone = "mid", bend = 0, flanges = [true, true], maxLength = 18, rings, limp = false, bias = 0.02, sys, free = [false, false], bundle, className } = {}) {
   const route = G.fillet(points, Math.max(bend || r * 2.6, 3), 10, { P, tube: r });
   const total = G.pathLength(route);
@@ -941,9 +943,6 @@ railing("deck.left.cage", -470, -307, -110, 12, 250, { h: 86, gaps: [[-32, -8]] 
 pipe("deck.pipe2", [[-110, -60, 420], [-110, -60, 480], [380, -60, 480], [380, -60, 420]], 4, { tone: "hi", bend: 10, maxLength: 40 });
 for (const x of [40, 220]) box("deck.pipe2.stand", [x - 2.5, -63, 420], [x + 2.5, -57, 476], { tone: "mid" }, { owner: "deck.pipe2", r: 0.3, extra: bolt([[x - 1.4, -57, 421.4], [x + 1.4, -57, 421.4]], 0.3) });
 SYS = "power";
-// the harness rack: two bolted end plates and four rows of cable between them
-for (const x0 of [-240, -164]) box("power.harness.plate", [x0, -86, 420], [x0 + 2, -80, 450], { tone: "mid" }, { r: 0.3, extra: bolt([[x0 + (SX > 0 ? 2 : 0), -83, 447.5], [x0 + (SX > 0 ? 2 : 0), -83, 422.5]], 0.3) });
-for (const [i, z] of [428, 434, 440, 446].entries()) pipe(`power.harness.cable.${i}`, [[-238, -83, z], [-164, -83, z]], 1, { limp: true, bundle: "harness", maxLength: 40, className: i % 2 ? "eu-tint eu-water" : "eu-tint eu-black" });
 // white trunking over the valve panel on two brackets, with cables up into the deck above
 box("power.trunking", [440, -30, 244], [616, -24, 252], { tone: "hi" }, { r: 0.6, steps: 2, bevel: 0.3,
   extra: Ln([440, 484, 528, 572].map((x) => faceY(-23.95, x + 1.5, x + 42.5, 245.5, 250.5)).join(""), { tone: "faint" }) + bolt([462, 506, 550, 594].map((x) => [x, -23.95, 251]), 0.3) });
