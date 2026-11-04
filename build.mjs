@@ -802,7 +802,7 @@ for (const x of [428, 528, 628]) for (const y of [-116, 18]) {
 deck("deck.right.low", 425, 631, -119, 21, 150);
 deck("deck.right.mid", 425, 631, -119, 21, 262);
 SYS = "power";
-cabinet("power.right.cab", [500, -40, 0], [570, 14, 120], { doors: 2, warn: true });
+cabinet("power.right.cab", [500, -40, 0], [566, 14, 120], { doors: 2, warn: true });
 cabinet("power.right.tall", [532, -60, 268], [624, 14, 410], { doors: 2, stop: true, louvres: 6 });
 column("power.sensor.stand", 479, 4, 0, 40, { s: 1.6, plate: true });
 box("power.sensor", [470, -2, 40], [488, 10, 58], { tone: "hi" }, { r: 1, steps: 2, bevel: 0.4,
@@ -811,14 +811,16 @@ turned("power.sensor.plug", yF(479, 10, 49), [[0, 2.4], [2.4, 2.4], [2.4, 1.7], 
 disc("power.sensor.grommet", zF(479, 24, 0), 0, 0.8, 2, { tone: "lo" });
 pipe("power.sensor.cable", [[479, 15, 49], [479, 24, 49], [479, 24, 0.8]], 0.9, { flanges: [false, false], bend: 4, limp: true, className: "eu-tint eu-black" });
 SYS = "cool";
-for (const [j, x] of [600, 614].entries()) {
+// two risers from the floor, each cut by four valve bodies: the pipe runs from body to body, so nothing wraps anything
+const VZ = [40, 70, 100, 130];
+for (const [j, x] of [598, 610].entries()) {
   disc("cool.right.port", zF(x, 6, 0), 0, 1, 4.2, { tone: "lo" });
-  pipe(`cool.right.header.${j}`, [[x, 6, 1], [x, 6, 150]], 2.4, { tone: "hi", maxLength: 30 });
-  [40, 70, 100, 130].forEach((z, i) => {
-    box("cool.right.valve", [x - 3.6, 2.4, z - 3.6], [x + 3.6, 9.6, z + 3.6], { tone: "mid" }, { owner: `cool.right.header.${j}`, r: 0.6, extra: bolt([[x - 2.4, 9.6, z + 2.4], [x + 2.4, 9.6, z - 2.4]], 0.3) });
+  [1, ...VZ.map((z) => z + 3.6)].forEach((z0, i) => pipe(`cool.right.header.${j}.${i}`, [[x, 6, z0], [x, 6, i < VZ.length ? VZ[i] - 3.6 : 150]], 2.4, { tone: "hi", flanges: [false, false], maxLength: 30 }));
+  VZ.forEach((z, i) => {
+    box("cool.right.valve", [x - 3.6, 2.4, z - 3.6], [x + 3.6, 9.6, z + 3.6], { tone: "mid" }, { r: 0.6, extra: bolt([[x - 2.4, 9.6, z + 2.4], [x + 2.4, 9.6, z - 2.4]], 0.3) });
     box("cool.right.lever", [x - 0.6, 9.6, z + 1.2], [x + 0.6, 16, z + 2.6], tint("water"), { owner: "cool.right.valve", r: 0.3 });
     if (j === 0) {
-      const lane = 574.5 + i * 5.5;
+      const lane = 572 + i * 5.5;
       pipe(`cool.right.hose.${i}`, [[x - 3.6, 6, z], [lane, 6, z], [lane, 6, 150]], 1.4, { bend: 4, className: "eu-tint eu-water" });
     }
   });
@@ -852,8 +854,8 @@ SYS = "deck";
 for (const x of [-258, -110, 40, 225]) column("deck.top.post", x, -114, 0, 414, { plate: true });
 deck("deck.top", -262, 425.5, -119, -40, 414, { grate: false });
 deck("deck.right.top", 425.5, 631, -119, 21, 414);
-pipe("deck.duct", [[-330, -70, 285], [-330, -70, 446], [470, -70, 446], [470, -70, 420]], 6, { tone: "hi", bend: 16, maxLength: 40 });
-for (const x of [-200, -40, 120, 300]) box("deck.duct.stand", [x - 3, -74, 420], [x + 3, -66, 440], { tone: "lo" }, { r: 0.3, extra: bolt([[x - 1.8, -66, 421.2], [x + 1.8, -66, 421.2]], 0.3) });
+pipe("deck.duct", [[-330, -70, 285], [-330, -70, 452], [500, -70, 452], [500, -70, 420]], 6, { tone: "hi", bend: 16, maxLength: 40 });
+for (const x of [-200, -40, 120, 300]) box("deck.duct.stand", [x - 3, -74, 420], [x + 3, -66, 446], { tone: "lo" }, { owner: "deck.duct", r: 0.3, extra: bolt([[x - 1.8, -66, 421.2], [x + 1.8, -66, 421.2]], 0.3) });
 box("deck.bulkhead", [-70, -118, 420], [70, -114, 488], { tone: "mid" }, { r: 0.4,
   extra: bolt([0.04, 0.5, 0.96].flatMap((f) => [[-70 + 140 * f, -114, 485], [-70 + 140 * f, -114, 423]]), 0.4) });
 for (const [x, z] of [[-32, 442], [32, 442], [-32, 468], [32, 468]]) {
@@ -867,7 +869,8 @@ for (const y of [-112, -94]) box("power.tray.rail", [-240, y, 420], [400, y + 2,
 for (let x = -230; x <= 390; x += 24) box("power.tray.rung", [x - 1, -110, 420], [x + 1, -94, 421.5], { tone: "lo" }, { r: 0.2 });
 for (const x0 of [-258, 404]) box("power.tray.box", [x0, -114, 420], [x0 + 14, -90, 434], { tone: "mid" }, { r: 0.8, steps: 2, bevel: 0.4,
   extra: Ln(faceY(-89.95, x0 + 2, x0 + 12, 422, 432), { tone: "lo" }) + bolt([[x0 + 3, -89.95, 423], [x0 + 11, -89.95, 423], [x0 + 3, -89.95, 431], [x0 + 11, -89.95, 431]], 0.32) });
-for (let i = 0; i < 5; i++) pipe(`power.tray.cable.${i}`, [[-244, -108 + i * 3.2, 422.4], [404, -108 + i * 3.2, 422.4]], 0.9, { maxLength: 80, limp: true, bundle: "tray", className: i % 2 ? "eu-tint eu-water" : "eu-tint eu-black" });
+// four cables lying just clear of the rungs, well inside the side rails
+for (let i = 0; i < 4; i++) pipe(`power.tray.cable.${i}`, [[-244, -106.8 + i * 3.2, 422.95], [404, -106.8 + i * 3.2, 422.95]], 0.9, { maxLength: 80, limp: true, bundle: "tray", className: i % 2 ? "eu-tint eu-water" : "eu-tint eu-black" });
 
 // ------------- 16 the small lines: conduits into the decks, cable drops, a connector panel, hoses over the top
 // conduits from every cabinet roof up into the deck above it
