@@ -723,8 +723,11 @@ function tank(name, x0, x1, y, zc, r, { sys = SYS, saddles = [0.18, 0.82], nozzl
   const F = xF(x0, y, zc);
   const L = x1 - x0;
   const hd = Math.min(10, r * 0.55);
-  const prof = [[0, r * 0.32], [hd * 0.1, r * 0.6, 1], [hd * 0.3, r * 0.8, 1], [hd * 0.62, r * 0.94, 1], [hd, r], [L - hd, r], [L - hd * 0.62, r * 0.94, 1], [L - hd * 0.3, r * 0.8, 1], [L - hd * 0.1, r * 0.6, 1], [L, r * 0.32]];
-  turned(name, F, prof, { tone: "hi" }, { sys, inner: Ln(G.arcOf(F, hd, r, P) + G.arcOf(F, L - hd, r, P), { tone: "faint" }) });
+  // the straps are steps in the same turned profile, so the tank and its straps order as one part
+  const straps = saddles.flatMap((f) => [[L * f - 1.6, r], [L * f - 1.6, r + 1.2], [L * f + 1.6, r + 1.2], [L * f + 1.6, r]]);
+  const prof = [[0, r * 0.32], [hd * 0.1, r * 0.6, 1], [hd * 0.3, r * 0.8, 1], [hd * 0.62, r * 0.94, 1], [hd, r], ...straps, [L - hd, r], [L - hd * 0.62, r * 0.94, 1], [L - hd * 0.3, r * 0.8, 1], [L - hd * 0.1, r * 0.6, 1], [L, r * 0.32]];
+  const strapBolts = saddles.map((f) => Dots(G.dotsOf(F, L * f, r + 1.2, 6, P, { fade: [0.05, 0.4] }), { size: 0.3 })).join("");
+  turned(name, F, prof, { tone: "hi" }, { sys, inner: Ln(G.arcOf(F, hd, r, P) + G.arcOf(F, L - hd, r, P), { tone: "faint" }), extra: strapBolts });
   for (const [s0, s1] of [[-1.6, 0], [L, L + 1.6]]) {
     const out = s0 < 0 ? -1 : 1;
     const face = seen([out, 0, 0]) ? Dots(G.dotsOf(F, out < 0 ? s0 : s1, r * 0.34, 10, P, { all: true }), { size: 0.34 }) : "";
@@ -732,7 +735,6 @@ function tank(name, x0, x1, y, zc, r, { sys = SYS, saddles = [0.18, 0.82], nozzl
   }
   for (const f of saddles) {
     const s = L * f;
-    disc(`${name}.strap`, F, s - 1.6, s + 1.6, r + 1.2, { tone: "mid" }, { sys, owner: name, extra: Dots(G.dotsOf(F, s, r + 1.2, 6, P, { fade: [0.05, 0.4] }), { size: 0.3 }) });
     box(`${name}.saddle`, [x0 + s - 3.4, y - r * 0.62, floor], [x0 + s + 3.4, y + r * 0.62, zc - r - 1.2], { tone: "lo" }, { sys, r: 0.3,
       extra: bolt([[x0 + s - 2.2, y + r * 0.62, floor + 1.2], [x0 + s + 2.2, y + r * 0.62, floor + 1.2]], 0.34) });
   }
@@ -746,23 +748,24 @@ function tank(name, x0, x1, y, zc, r, { sys = SYS, saddles = [0.18, 0.82], nozzl
 
 // ------------- 13 left module: service platform, tanks, cabinets, manifold
 SYS = "deck";
-const LM = { x0: -479, x1: -277, y0: -119, y1: 21 };
-for (const x of [-476, -378, -280]) for (const y of [-116, 18]) {
+// its right edge stops short of where the source chamber slides when the machine comes apart
+const LM = { x0: -479, x1: -298, y0: -119, y1: 21 };
+for (const x of [-476, -387, -301]) for (const y of [-116, 18]) {
   column("deck.left.post", x, y, 0, 140, { plate: true });
   column("deck.left.post", x, y, 146, 244);
 }
 deck("deck.left.mid", LM.x0, LM.x1, LM.y0, LM.y1, 140);
 deck("deck.left.top", LM.x0, LM.x1, LM.y0, LM.y1, 244);
-railing("deck.left.rail", -474, -282, -114, 16, 250, { gaps: [[-32, -8]] });
+railing("deck.left.rail", -474, -303, -114, 16, 250, { gaps: [[-32, -8]] });
 // a ladder up the end, bracketed to both decks
 for (const y of [-30, -10]) {
   box("deck.ladder.stile", [-484, y - 1.5, 0], [-482, y + 1.5, 290], { tone: "mid" }, { r: 0.3 });
   for (const z of [141, 245]) box("deck.ladder.bracket", [-482, y - 1.5, z], [-479, y + 1.5, z + 4], { tone: "lo" }, { r: 0.2, extra: bolt([[-480.5, y + 1.5, z + 2]], 0.3) });
 }
 for (let z = 12; z < 286; z += 11) rod("deck.ladder.rung", [-483, -28.5, z], [-483, -11.5, z], 0.75, { tone: "hi" });
-tank("deck.tank.a", -470, -382, -2, 168, 18, { nozzles: [30, 58] });
-tank("deck.tank.b", -374, -286, -2, 168, 18, { nozzles: [28, 60] });
-tank("deck.tank.c", -468, -290, -78, 170, 16, { saddles: [0.12, 0.5, 0.88], nozzles: [38, 88, 138] });
+tank("deck.tank.a", -470, -391, -2, 168, 18, { nozzles: [28, 54] });
+tank("deck.tank.b", -383, -307, -2, 168, 18, { nozzles: [24, 52] });
+tank("deck.tank.c", -468, -306, -78, 170, 16, { saddles: [0.12, 0.5, 0.88], nozzles: [38, 100, 130] });
 // exhaust fan box on the platform: the duct over the top tier starts here
 box("deck.exhaust", [-345, -85, 250], [-315, -55, 285], { tone: "mid" }, { r: 1, steps: 2, bevel: 0.4,
   inner: Ln(k.sideSeam({ x: -345, y: -85, w: 30, d: 30, r: 1 }, 280, P, 2), { tone: "faint" }),
@@ -770,9 +773,9 @@ box("deck.exhaust", [-345, -85, 250], [-315, -55, 285], { tone: "mid" }, { r: 1,
 SYS = "power";
 cabinet("power.left.cab", [-472, -60, 0], [-450, 14, 128]);
 cabinet("power.left.cab", [-448, -60, 0], [-426, 14, 128]);
-cabinet("power.left.ecab", [-334, -24, 0], [-288, 14, 120], { warn: true });
+cabinet("power.left.ecab", [-348, -24, 0], [-306, 14, 120], { warn: true });
 for (let i = 0; i < 5; i++) {
-  const x = -326 + i * 6;
+  const x = -340 + i * 6;
   disc("power.left.gland", yF(x, 14, 10), 0, 1.6, 1.3, { tone: "hi" });
   disc("power.left.grommet", zF(x, 24, 0), 0, 0.8, 1.9, { tone: "lo" });
   pipe(`power.left.cable.${i}`, [[x, 15.6, 10], [x, 24, 10], [x, 24, 0.8]], 0.7, { flanges: [false, false], bend: 3, limp: true, className: "eu-tint eu-black" });
