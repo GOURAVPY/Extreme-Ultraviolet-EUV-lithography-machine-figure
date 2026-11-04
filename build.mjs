@@ -62,7 +62,7 @@ const P = k.fitProjection(
     // the apart pose: illuminator up 40, reticle stage up 55
     [-235, -85, 368], [-235, 0, 368], [94, -85, 368], [30, -85, 402], [205, -85, 402], [30, 0, 402], [205, 0, 402],
     // the outside: service platform and railings, top tier, ports, duct and the right-hand module
-    [-484, -118, 292], [-484, 22, 292], [-262, -119, 488], [-70, -118, 488], [70, -118, 488], [-330, -76, 460], [500, -76, 460], [631, -119, 422], [631, 21, 422], [631, 21, 0]],
+    [-484, -118, 292], [-484, 22, 292], [-262, -119, 488], [-70, -118, 488], [70, -118, 488], [-330, -51, 448], [500, -51, 448], [650, 10, 160], [631, -119, 422], [631, 21, 422], [631, 21, 0]],
   W,
   H,
   { pad: 26, azimuth: AZIMUTH, elevation: ELEVATION },
@@ -128,7 +128,10 @@ const PIPES = [];
 const ARM_X = [];
 // Looked at 8x: the floor slab counts as a rod, but these lines end on blocks standing well inside it.
 // The manifold risers stand on valves on the manifold block, so their feet sit on its outline and the floor's by design.
-const CROWD_OK = [["vac.h2.line", "stand.fab"], ["cool.left.riser*", "stand.fab"], ["cool.left.riser*", "cool.left.manifold"]];
+// The tray cables lie between the tray's rails, and the hose loops hang behind the bay's X braces and posts: looked at 4x.
+// The first water riser segment ends on its valve just above the floor's front edge.
+const CROWD_OK = [["vac.h2.line", "stand.fab"], ["cool.left.riser*", "stand.fab"], ["cool.left.riser*", "cool.left.manifold"],
+  ["power.tray.cable*", "power.tray.rail"], ["cool.loop*", "cool.bay.brace"], ["cool.loop*", "deck.right.post"], ["cool.right.header*", "stand.fab"]];
 function pipe(name, points, r, { tone = "mid", bend = 0, flanges = [true, true], maxLength = 18, rings, limp = false, bias = 0.02, sys, free = [false, false], bundle, className } = {}) {
   const route = G.fillet(points, Math.max(bend || r * 2.6, 3), 10, { P, tube: r });
   const total = G.pathLength(route);
@@ -768,9 +771,9 @@ tank("deck.tank.a", -470, -391, -2, 168, 18, { nozzles: [28, 54] });
 tank("deck.tank.b", -383, -307, -2, 168, 18, { nozzles: [24, 52] });
 tank("deck.tank.c", -468, -306, -78, 170, 16, { saddles: [0.12, 0.5, 0.88], nozzles: [38, 100, 130] });
 // exhaust fan box on the platform: the duct over the top tier starts here
-box("deck.exhaust", [-345, -85, 250], [-315, -55, 285], { tone: "mid" }, { r: 1, steps: 2, bevel: 0.4,
-  inner: Ln(k.sideSeam({ x: -345, y: -85, w: 30, d: 30, r: 1 }, 280, P, 2), { tone: "faint" }),
-  extra: Ln(Array.from({ length: 5 }, (_, j) => faceY(-54.95, -340, -320, 256 + j * 4, 257.6 + j * 4)).join(""), { tone: "lo" }) + bolt(k.corners({ x: -345, y: -85, w: 30, d: 30 }, 1.6).map(([x, y]) => [x, y, 285])) });
+box("deck.exhaust", [-345, -60, 250], [-315, -30, 285], { tone: "mid" }, { r: 1, steps: 2, bevel: 0.4,
+  inner: Ln(k.sideSeam({ x: -345, y: -60, w: 30, d: 30, r: 1 }, 280, P, 2), { tone: "faint" }),
+  extra: Ln(Array.from({ length: 5 }, (_, j) => faceY(-29.95, -340, -320, 256 + j * 4, 257.6 + j * 4)).join(""), { tone: "lo" }) + bolt(k.corners({ x: -345, y: -60, w: 30, d: 30 }, 1.6).map(([x, y]) => [x, y, 285])) });
 SYS = "power";
 cabinet("power.left.cab", [-472, -60, 0], [-450, 14, 128]);
 cabinet("power.left.cab", [-448, -60, 0], [-426, 14, 128]);
@@ -858,8 +861,9 @@ SYS = "deck";
 for (const x of [-258, -110, 40, 225]) column("deck.top.post", x, -114, 0, 414, { plate: true });
 deck("deck.top", -262, 425.5, -119, -40, 414, { grate: false });
 deck("deck.right.top", 425.5, 631, -119, 21, 414);
-pipe("deck.duct", [[-330, -70, 285], [-330, -70, 452], [500, -70, 452], [500, -70, 420]], 6, { tone: "hi", bend: 16, maxLength: 40 });
-for (const x of [-200, -40, 120, 300]) box("deck.duct.stand", [x - 3, -74, 420], [x + 3, -66, 446], { tone: "lo" }, { owner: "deck.duct", r: 0.3, extra: bolt([[x - 1.8, -66, 421.2], [x + 1.8, -66, 421.2]], 0.3) });
+// the duct runs low along the top tier's front edge, so on screen it passes below the tray and the ports, not over them
+pipe("deck.duct", [[-330, -45, 285], [-330, -45, 440], [500, -45, 440], [500, -45, 420]], 6, { tone: "hi", bend: 14, maxLength: 40 });
+for (const x of [-200, -40, 120, 300]) box("deck.duct.stand", [x - 3, -49, 420], [x + 3, -41, 434], { tone: "lo" }, { owner: "deck.duct", r: 0.3, extra: bolt([[x - 1.8, -41, 421.2], [x + 1.8, -41, 421.2]], 0.3) });
 box("deck.bulkhead", [-70, -118, 420], [70, -114, 488], { tone: "mid" }, { r: 0.4,
   extra: bolt([0.04, 0.5, 0.96].flatMap((f) => [[-70 + 140 * f, -114, 485], [-70 + 140 * f, -114, 423]]), 0.4) });
 for (const [x, z] of [[-32, 442], [32, 442], [-32, 468], [32, 468]]) {
