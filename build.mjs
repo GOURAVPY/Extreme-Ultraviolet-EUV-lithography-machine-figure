@@ -901,8 +901,9 @@ box("deck.bulkhead", [-70, -118, 420], [70, -114, 488], { tone: "mid" }, { r: 0.
   extra: bolt([0.04, 0.5, 0.96].flatMap((f) => [[-70 + 140 * f, -114, 485], [-70 + 140 * f, -114, 423]]), 0.4) });
 for (const [x, z] of [[-32, 442], [32, 442], [-32, 468], [32, 468]]) {
   const F = yF(x, -114, z);
-  // octagonal plates, as on the real machine's top tier
-  disc("deck.port", F, 0, 3, 12, { tone: "hi" }, { steps: 8, extra: Dots(G.dotsOf(F, 3, 10.2, 12, P, { all: true }), { size: 0.42 }) });
+  // octagonal plates, as on the real machine's top tier: an 8-sided prism, flat sides level and plumb
+  const oct = Array.from({ length: 8 }, (_, j) => [12 * Math.cos(Math.PI / 8 + (j * Math.PI) / 4), 12 * Math.sin(Math.PI / 8 + (j * Math.PI) / 4)]);
+  put("deck.port", G.add3(F.o, G.mul3(F.a, 1.5)), S(G.prismOf(F, oct, 0, 3, P), { tone: "hi" }) + Dots(G.dotsOf(F, 3, 10.2, 12, P, { all: true }), { size: 0.42 }), [record(A.prism(F, oct, 0, 3, { name: "deck.port" }))]);
   const C = yF(x, -111, z);
   disc("deck.port.cover", C, 0, 1.4, 8, { tone: "mid" }, { extra: Ln(G.circleOf(C, 1.4, 5.6, P, 40), { tone: "faint" }) + Dots(G.dotsOf(C, 1.4, 7, 8, P, { all: true }), { size: 0.3 }) });
 }
