@@ -133,7 +133,9 @@ const ARM_X = [];
 const CROWD_OK = [["vac.h2.line", "stand.fab"], ["cool.left.riser*", "stand.fab"], ["cool.left.riser*", "cool.left.manifold"],
   ["power.tray.cable*", "power.tray.rail"], ["cool.loop*", "cool.bay.brace"], ["cool.loop*", "deck.right.post"], ["cool.right.header*", "stand.fab"],
   // the duct rises from its fan box inside the platform's cage, so a cage post stands in front of its foot
-  ["deck.duct", "deck.left.cage.post"]];
+  ["deck.duct", "deck.left.cage.post"],
+  // the tall control cabinet counts as a rod; its own cables leave from glands on its face
+  ["power.right.ctrl.cable*", "power.right.ctrl"]];
 function pipe(name, points, r, { tone = "mid", bend = 0, flanges = [true, true], maxLength = 18, rings, limp = false, bias = 0.02, sys, free = [false, false], bundle, className } = {}) {
   const route = G.fillet(points, Math.max(bend || r * 2.6, 3), 10, { P, tube: r });
   const total = G.pathLength(route);
