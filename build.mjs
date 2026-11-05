@@ -685,7 +685,7 @@ function glands(name, xs, yf, z, floor, yOut, { sys = SYS } = {}) {
     pipe(`${name}.cable.${i}`, [[x, yf + 1.6, z], [x, yOut, z], [x, yOut, floor + 0.8]], 0.7, { flanges: [false, false], bend: Math.min(3, yOut - yf - 2), limp: true, sys, className: i % 3 === 2 ? "eu-tint eu-water" : "eu-tint eu-black" });
   });
 }
-function cabinet(name, [x0, y0, z0], [x1, y1, z1], { doors = 1, sys = SYS, warn = false, stop = false, louvres = 4, ports = 0 } = {}) {
+function cabinet(name, [x0, y0, z0], [x1, y1, z1], { doors = 1, sys = SYS, warn = false, stop = false, louvres = 4, ports = 0, buttons = 0 } = {}) {
   const plan = { x: x0, y: y0, w: x1 - x0, d: y1 - y0, r: 0.8 };
   const zb = z0 + 3;
   box(`${name}.plinth`, [x0 + 1.5, y0 + 1.5, z0], [x1 - 1.5, y1 - 1.5, zb], { tone: "lo" }, { sys, r: 0.4 });
@@ -710,6 +710,10 @@ function cabinet(name, [x0, y0, z0], [x1, y1, z1], { doors = 1, sys = SYS, warn 
   const sockets = Array.from({ length: ports }, (_, j) => [x0 + 6 + j * 4.4, yf, zb + 24]);
   sockets.forEach(([x, y, z]) => lines.push(G.circleOf(yF(x, y, z), 0, 1.5, P, 18)));
   hinges.push(...sockets);
+  // an operator panel: rows of push buttons, each a bezel ring round its cap
+  const pushes = Array.from({ length: buttons }, (_, j) => [x0 + 8 + (j % 4) * 6, yf, z1 - 26 - Math.floor(j / 4) * 6]);
+  pushes.forEach(([x, y, z]) => lines.push(G.circleOf(yF(x, y, z), 0, 2, P, 20)));
+  hinges.push(...pushes);
   box(name, [x0, y0, zb], [x1, y1, z1], { tone: "mid" }, { sys, r: 0.8, steps: 2, bevel: 0.5,
     inner: Ln(k.sideSeam(plan, z1 - 3, P, 2), { tone: "faint" }),
     extra: Ln(lines.join(""), { tone: "lo" }) + bolt(hinges, 0.55, "mid") + bolt(k.corners(plan, 1.6).map(([x, y]) => [x, y, z1]), 0.42) + bolt([[x0 + 4.8, yf, z1 - 8], [x0 + 12.2, yf, z1 - 8]], 0.3) +
@@ -826,6 +830,9 @@ cabinet("power.right.cab", [500, -40, 0], [560, 14, 120], { doors: 2, warn: true
 cabinet("power.right.tall", [532, -60, 268], [624, 14, 410], { doors: 2, stop: true, louvres: 6, ports: 8 });
 glands("power.right.cab", [505, 511, 517, 543, 549, 555], 14, 10, 0, 24);
 glands("power.right.tall", [548, 556, 592, 600], 14, 278, 268, 19.5);
+// the tall control cabinet standing at the far right, beyond the water riser, as at the right edge of the photo
+cabinet("power.right.ctrl", [652, -60, 0], [692, 14, 300], { stop: true, ports: 6, buttons: 12 });
+glands("power.right.ctrl", [660, 670, 680], 14, 10, 0, 24);
 column("power.sensor.stand", 479, 4, 0, 40, { s: 1.6, plate: true });
 box("power.sensor", [470, -2, 40], [488, 10, 58], { tone: "hi" }, { r: 1, steps: 2, bevel: 0.4,
   inner: Ln(k.sideSeam({ x: 470, y: -2, w: 18, d: 12, r: 1 }, 54, P, 2), { tone: "faint" }), extra: bolt([[471.6, 10, 56.4], [486.4, 10, 56.4], [471.6, 10, 41.6], [486.4, 10, 41.6]], 0.36) });
