@@ -19,8 +19,8 @@ const ELEVATION = 28;
 // World: about 5 mm per unit at the wafer, z up, fab floor at z = 0, subfab floor at z = -130.
 // The light runs in the plane y = Y0; every housing has its front panel off (y = its front face).
 const Y0 = -35;
-const FAB = { x: -490, y: -125, w: 1140, d: 170, r: 4 };
-const SUB = { x: -490, y: -125, w: 1140, d: 245, r: 6 };
+const FAB = { x: -490, y: -125, w: 1190, d: 170, r: 4 };
+const SUB = { x: -490, y: -125, w: 1190, d: 245, r: 6 };
 const SUB_Z = -130;
 const LAS_Y = 82; // drive laser beam line in the subfab
 const LAS_Z = -98;
@@ -62,7 +62,7 @@ const P = k.fitProjection(
     // the apart pose: illuminator up 40, reticle stage up 55
     [-235, -85, 368], [-235, 0, 368], [94, -85, 368], [30, -85, 402], [205, -85, 402], [30, 0, 402], [205, 0, 402],
     // the outside: service platform and railings, top tier, ports, duct and the right-hand module
-    [-484, -118, 292], [-484, 22, 292], [-262, -119, 488], [-70, -118, 488], [70, -118, 488], [-330, -51, 448], [500, -51, 448], [650, 10, 160], [-110, -64, 486], [380, -64, 486], [631, -119, 422], [631, 21, 422], [631, 21, 0]],
+    [-484, -118, 292], [-484, 22, 292], [-262, -119, 488], [-70, -118, 488], [70, -118, 488], [-330, -51, 448], [500, -51, 448], [650, 10, 160], [-110, -64, 486], [380, -64, 486], [631, -119, 422], [631, 21, 422], [631, 21, 0], [700, 21, 0], [692, -60, 306], [692, 14, 306]],
   W,
   H,
   { pad: 26, azimuth: AZIMUTH, elevation: ELEVATION },
@@ -168,7 +168,7 @@ back.push(S(k.slabOf(SUB, SUB_Z - 10, 10, P, 6, 1.2), { tone: "lo", inner: Ln(k.
 back.push(Ln(k.planOutline(k.insetPlan(SUB, 5), SUB_Z, P), { tone: "faint" }));
 record(A.slab(SUB, SUB_Z - 10, 10, { name: "stand.subfab", ground: true }, 6));
 SYS = "frame";
-for (const x of [-460, -370, -280, -160, -40, 80, 200, 320, 400, 500, 620]) {
+for (const x of [-460, -370, -280, -160, -40, 80, 200, 320, 400, 500, 600, 680]) {
   disc("stand.pedestal", zF(x, 33, SUB_Z), 0, 3, 5, { tone: "lo" });
   disc("stand.pedestal", zF(x, 33, SUB_Z), 3, 120, 2.6, { tone: "mid" }, { inner: Ln(G.arcOf(zF(x, 33, SUB_Z), 60, 2.6, P), { tone: "faint" }) });
 }
@@ -892,7 +892,8 @@ box("deck.bulkhead", [-70, -118, 420], [70, -114, 488], { tone: "mid" }, { r: 0.
   extra: bolt([0.04, 0.5, 0.96].flatMap((f) => [[-70 + 140 * f, -114, 485], [-70 + 140 * f, -114, 423]]), 0.4) });
 for (const [x, z] of [[-32, 442], [32, 442], [-32, 468], [32, 468]]) {
   const F = yF(x, -114, z);
-  disc("deck.port", F, 0, 3, 12, { tone: "hi" }, { extra: Dots(G.dotsOf(F, 3, 10.4, 12, P, { all: true }), { size: 0.42 }) });
+  // octagonal plates, as on the real machine's top tier
+  disc("deck.port", F, 0, 3, 12, { tone: "hi" }, { steps: 8, extra: Dots(G.dotsOf(F, 3, 10.2, 12, P, { all: true }), { size: 0.42 }) });
   const C = yF(x, -111, z);
   disc("deck.port.cover", C, 0, 1.4, 8, { tone: "mid" }, { extra: Ln(G.circleOf(C, 1.4, 5.6, P, 40), { tone: "faint" }) + Dots(G.dotsOf(C, 1.4, 7, 8, P, { all: true }), { size: 0.3 }) });
 }
